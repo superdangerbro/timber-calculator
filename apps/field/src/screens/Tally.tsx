@@ -4,6 +4,7 @@ import { useApp } from '../app';
 import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
 import { GpsChip, SyncChip } from '../components/chips';
+import { ClashBanner } from '../components/ClashBanner';
 import { FieldEditor, FieldGrid, type FieldKey } from '../components/fields';
 import { TreeMap } from '../map/TreeMap';
 import { isToday } from '../state/repo';
@@ -177,6 +178,8 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
           <span />
         </button>
 
+        <ClashBanner />
+
         {expanded ? (
           <div className="draft-head">
             <div className={`phase-pill ${t.phase}`} data-testid="phase">
@@ -195,7 +198,7 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
             </button>
           </div>
         ) : (
-          <TagDisplay tag={t.lastTag} fresh={t.phase === 'saved'} />
+          <TagDisplay tag={t.lastTag} fresh={t.phase === 'saved' && !r.clashes.some((c) => c.tree.id === t.lastTreeId)} />
         )}
 
         {expanded && (

@@ -25,6 +25,40 @@ export interface RepoState {
   blocks: Block[];
   settings: Settings;
   unsyncedCount: number;
+  /** Trees on this device whose tag is also held by an earlier tree elsewhere. */
+  clashes: TagClash[];
+}
+
+export interface TagClash {
+  tree: Tree;
+  /** The tree that keeps the tag (earliest created, then lowest id). */
+  holder: Tree;
+}
+
+/**
+ * Two live trees with the same tag (tallied before first sign-in, or on two
+ * offline devices sharing a prefix). The earliest-created tree keeps the tag;
+ * every other one created on `deviceId` must be re-tagged. Every device applies
+ * the same rule, so they agree on who keeps it without talking to each other.
+ */
+export function findClashes(trees: Tree[], deviceId: string): TagClash[] {
+  const byTag = new Map<string, Tree[]>();
+  for (const t of trees) {
+    if (t.voided || !t.tag) continue;
+    const list = byTag.get(t.tag);
+    if (list) list.push(t);
+    else byTag.set(t.tag, [t]);
+  }
+  const out: TagClash[] = [];
+  for (const list of byTag.values()) {
+    if (list.length < 2) continue;
+    const sorted = [...list].sort((a, b) =>
+      a.createdAt === b.createdAt ? (a.id < b.id ? -1 : 1) : a.createdAt < b.createdAt ? -1 : 1,
+    );
+    const holder = sorted[0];
+    for (const t of sorted.slice(1)) if (t.deviceId === deviceId) out.push({ tree: t, holder });
+  }
+  return out.sort((a, b) => (a.tree.createdAt < b.tree.createdAt ? -1 : 1));
 }
 
 /** "J-L0003" is the leave-tree series; everything else is the main series. */
@@ -58,6 +92,7 @@ export class Repo extends Emitter<RepoState> {
       blocks: [],
       settings: defaultSettings(''),
       unsyncedCount: 0,
+      clashes: [],
     });
   }
 
@@ -95,7 +130,12 @@ export class Repo extends Emitter<RepoState> {
   private setEvents(events: StoredEvent[]) {
     const trees = foldAll(events.map((e) => e.event));
     trees.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-    this.setState({ events, trees, unsyncedCount: events.filter((e) => !e.synced).length });
+    this.setState({
+      events,
+      trees,
+      unsyncedCount: events.filter((e) => !e.synced).length,
+      clashes: findClashes(trees, this.state.settings.deviceId),
+    });
   }
 
   private enqueue<T>(fn: () => Promise<T>): Promise<T> {
@@ -184,6 +224,27 @@ export class Repo extends Emitter<RepoState> {
         position: position ?? { lat: 0, lon: 0, accuracyM: 0, fixCount: 0 },
         fields,
       });
+      return this.tree(treeId)!;
+    });
+  }
+
+  /**
+   * Give a clashing tree the next free number in its series (main or leave) under
+   * the current prefix. The old number stays burnt; the re-tag is an `update`
+   * event, so the history shows both tags.
+   */
+  retag(treeId: string): Promise<Tree> {
+    return this.enqueue(async () => {
+      const tree = this.tree(treeId);
+      if (!tree) throw new Error('No such tree');
+      const leave = tagSeries(tree.tag) === 'L';
+      const { tag, tagNumber } = this.peekTag(leave);
+      const prefix = this.prefix;
+      const tagHighWater = { ...this.state.settings.tagHighWater, [`${prefix}:${leave ? 'L' : 'N'}`]: tagNumber };
+      const settings = { ...this.state.settings, tagHighWater };
+      await this.store.setSetting('settings', settings);
+      this.state = { ...this.state, settings };
+      await this.append(treeId, 'update', { tag, tagNumber, prefix, fields: {}, retaggedFrom: tree.tag });
       return this.tree(treeId)!;
     });
   }

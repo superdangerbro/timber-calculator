@@ -26,6 +26,7 @@ const PATHS: Record<string, string> = {
   send: 'M4 12 20 4l-6 16-3-7-7-1Z',
   chevronUp: 'm6 15 6-6 6 6',
   chevronDown: 'm6 9 6 6 6-6',
+  alert: 'M12 3 2 20h20L12 3Zm0 6v5m0 3h.01',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
 };
 

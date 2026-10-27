@@ -1807,3 +1807,45 @@ i {
 .tally-map .map-btn {
   bottom: 30px;
 }
+
+/* Tag clash: same tag on two live trees; one tap re-tags ours. */
+.clash-banner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: #3a1d0b;
+  border: 2px solid var(--orange);
+  color: var(--text);
+}
+.clash-banner > svg {
+  color: var(--orange);
+}
+.clash-text {
+  font-size: 16px;
+  line-height: 1.35;
+}
+.clash-text b {
+  color: var(--amber);
+}
+.clash-banner .btn {
+  grid-column: 1 / -1;
+  min-height: 56px;
+  font-size: 19px;
+}
+.clash-banner.done {
+  grid-template-columns: 1fr;
+  border-color: var(--good);
+  background: var(--forest-700);
+  text-align: center;
+}
+.clash-newtag {
+  font-size: 84px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--orange);
+}

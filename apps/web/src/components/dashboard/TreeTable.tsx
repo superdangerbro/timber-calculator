@@ -57,8 +57,8 @@ function EditableCell({ value, kind, display, onCommit, disabled, label }: {
 
 const col = createColumnHelper<Row>();
 
-export function TreeTable({ rows, selectedIds, onRowClick, onToggle, onToggleAll, onEdit, onHistory, onVoid, scrollToId }: {
-  rows: Row[]; selectedIds: Set<string>;
+export function TreeTable({ rows, dupTags, selectedIds, onRowClick, onToggle, onToggleAll, onEdit, onHistory, onVoid, scrollToId }: {
+  rows: Row[]; dupTags?: Set<string>; selectedIds: Set<string>;
   onRowClick: (id: string, additive: boolean) => void; onToggle: (id: string) => void; onToggleAll: (ids: string[] | null) => void;
   onEdit: EditFn; onHistory: (t: Tree) => void; onVoid: (t: Tree) => void; scrollToId: string | null;
 }) {
@@ -84,9 +84,19 @@ export function TreeTable({ rows, selectedIds, onRowClick, onToggle, onToggleAll
             onClick={(e) => e.stopPropagation()} onChange={() => onToggle(c.row.original.tree.id)} />
         ),
       }),
-      col.accessor((r) => r.tree.prefix + String(r.tree.tagNumber).padStart(6, '0') + (r.tree.leaveTree ? 'L' : ''), {
+      // Natural order per prefix: main series J-0001, J-0002 ... then the leave series J-L0001 ...
+      col.accessor((r) => `${r.tree.prefix}|${/-L\d+$/.test(r.tree.tag) ? 1 : 0}|${String(r.tree.tagNumber).padStart(6, '0')}|${r.tree.tag}`, {
         id: 'tag', header: 'Tag',
-        cell: (c) => <span className={`tag${c.row.original.tree.voided ? ' voided' : ''}`}>{c.row.original.tree.tag}</span>,
+        cell: (c) => {
+          const t = c.row.original.tree;
+          const dup = !t.voided && dupTags?.has(t.tag);
+          return (
+            <span className="tag-cell">
+              <span className={`tag${t.voided ? ' voided' : ''}`}>{t.tag}</span>
+              {dup && <span className="dup-badge" title="Another live tree has this tag" data-testid="dup-badge">DUP</span>}
+            </span>
+          );
+        },
       }),
       col.accessor((r) => r.tree.species ?? '', {
         id: 'species', header: 'Species',
@@ -134,7 +144,7 @@ export function TreeTable({ rows, selectedIds, onRowClick, onToggle, onToggleAll
         ),
       }),
     ];
-  }, [selectedIds, onEdit, onHistory, onVoid, onToggle]);
+  }, [selectedIds, dupTags, onEdit, onHistory, onVoid, onToggle]);
 
   const table = useReactTable({
     data: rows, columns, state: { sorting }, onSortingChange: setSorting,

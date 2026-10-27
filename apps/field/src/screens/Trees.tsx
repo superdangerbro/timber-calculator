@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { SpeciesCode, Tree, TreeFields } from '@timber/core';
+import { ClashBanner } from '../components/ClashBanner';
 import { useApp } from '../app';
 import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
@@ -131,6 +132,7 @@ export function TreesScreen() {
           ))}
         </div>
       </header>
+      <ClashBanner showResult />
 
       <div className="filters">
         <div className="chip-scroll">

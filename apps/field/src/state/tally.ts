@@ -281,6 +281,21 @@ export class TallyController extends Emitter<TallyState> {
     return this.sayThenListen(tagSpeech(tree.tag));
   }
 
+  /** Re-tag a tree whose tag clashed; show and speak the new tag for fresh tape. */
+  async retag(treeId: string) {
+    const old = this.deps.repo.tree(treeId)?.tag;
+    const tree = await this.deps.repo.retag(treeId);
+    this.turn++;
+    this.setDraft({});
+    this.setState({
+      phase: 'saved',
+      lastTag: tree.tag,
+      lastTreeId: tree.id,
+      notice: `Re-tagged ${old} as ${tree.tag}: put new tape on it`,
+    });
+    return this.sayThenListen(`Re-tag. ${tagSpeech(tree.tag)}`);
+  }
+
   async repeat() {
     const { lastTag, phase, draft } = this.state;
     if (lastTag && (phase === 'saved' || isEmpty(draft))) {

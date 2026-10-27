@@ -117,6 +117,13 @@ function DashboardInner({ me }: { me: Me }) {
     [filtered, colorizer, area, inAreaIds],
   );
   const tableTrees = onlyInArea ? inArea : filtered;
+  // Same tag on two live trees (e.g. a phone tallied before its first sign-in).
+  const dupTags = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const t of trees) if (!t.voided) seen.set(t.tag, (seen.get(t.tag) ?? 0) + 1);
+    return new Set([...seen].filter(([, n]) => n > 1).map(([tag]) => tag));
+  }, [trees]);
+  const [dupOnly, setDupOnly] = useState(false);
   const rows: Row[] = useMemo(
     () => tableTrees.map((t) => ({ tree: t, val: valuations.get(t.id)!, user: userMap.get(t.createdBy) })),
     [tableTrees, valuations, userMap],
@@ -337,6 +344,12 @@ function DashboardInner({ me }: { me: Me }) {
                 {area && (
                   <label className="check small-check"><input type="checkbox" checked={onlyInArea} onChange={(e) => setOnlyInArea(e.target.checked)} /> Only trees in area</label>
                 )}
+                {dupTags.size > 0 && (
+                  <button className={`btn small dup-btn${dupOnly ? ' on' : ''}`} onClick={() => setDupOnly((v) => !v)} data-testid="dup-tags"
+                    title="Two live trees share these tags. Re-tag one of each pair in the field app.">
+                    ⚠ {dupTags.size} duplicate tag{dupTags.size === 1 ? '' : 's'}{dupOnly ? ' · show all' : ''}
+                  </button>
+                )}
                 <span className="muted hint-edit">Click a value to edit</span>
               </div>
               <div className="tt-right">
@@ -347,7 +360,7 @@ function DashboardInner({ me }: { me: Me }) {
                 <button className="btn primary small" onClick={openReport} data-testid="open-report">Print report</button>
               </div>
             </div>
-            <TreeTable rows={rows} selectedIds={selectedIds} onRowClick={(id, add) => selectTree(id, add, 'table')} onToggle={toggleRow}
+            <TreeTable rows={dupOnly && dupTags.size ? rows.filter((r) => dupTags.has(r.tree.tag)) : rows} dupTags={dupTags} selectedIds={selectedIds} onRowClick={(id, add) => selectTree(id, add, 'table')} onToggle={toggleRow}
               onToggleAll={(ids) => setSelectedIds(new Set(ids ?? []))} onEdit={onEdit} onHistory={onHistory} onVoid={onVoid}
               scrollToId={scrollToId ? scrollToId.split(':')[0] : null} />
           </div>

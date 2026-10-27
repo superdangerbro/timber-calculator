@@ -404,3 +404,7 @@ html:has(.report), body:has(.report) { background: #e9eeea; }
   .rep-table tr { break-inside: avoid; }
   @page { size: letter; margin: 14mm; }
 }
+.tag-cell { display: inline-flex; align-items: center; gap: 6px; }
+.dup-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; padding: 2px 5px; border-radius: 4px; background: #ff5d5d; color: #1a0505; }
+.dup-btn { background: rgba(255, 93, 93, 0.14); border-color: #ff5d5d; color: #ffb3b3; }
+.dup-btn.on { background: #ff5d5d; color: #1a0505; }
