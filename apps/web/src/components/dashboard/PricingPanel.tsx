@@ -1,0 +1,152 @@
+'use client';
+import { SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
+import { money, signed } from '@/lib/format';
+
+export function PricingPanel({
+  scenario, onChange, saved, activeId, onSelect, dirty, onSave, onSaveAs, onRevert, saving,
+  compareId, onCompare, current, compare, onClose,
+}: {
+  scenario: Scenario; onChange: (s: Scenario) => void; saved: Scenario[]; activeId: string | null; onSelect: (id: string) => void;
+  dirty: boolean; onSave: () => void; onSaveAs: () => void; onRevert: () => void; saving: boolean;
+  compareId: string; onCompare: (id: string) => void; current: AreaSummary; compare: AreaSummary | null; onClose: () => void;
+}) {
+  const spec = scenario.poleSpec;
+  const setSpec = (patch: Partial<Scenario['poleSpec']>) => onChange({ ...scenario, poleSpec: { ...spec, ...patch } });
+  const n = (v: string) => (v === '' ? 0 : Math.max(0, Number(v)));
+  const compareName = saved.find((s) => s.id === compareId)?.name;
+
+  return (
+    <aside className="pricing" data-testid="pricing-panel" aria-label="What-if pricing">
+      <div className="pricing-head">
+        <div>
+          <h2>What-if pricing</h2>
+          <p className="muted">Prices only change values, never measurements.</p>
+        </div>
+        <button className="btn ghost small" onClick={onClose} aria-label="Hide pricing panel" title="Hide panel">Hide ›</button>
+      </div>
+
+      <div className="pricing-body">
+        <div className="pgroup">
+          <label className="label" htmlFor="scenario-select">Scenario</label>
+          <div className="row">
+            <select id="scenario-select" className="select grow" value={activeId ?? ''} onChange={(e) => onSelect(e.target.value)} data-testid="scenario-select">
+              {!activeId && <option value="">Unsaved scenario</option>}
+              {saved.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          {dirty && <div className="dirty-note" data-testid="dirty-note">● Unsaved changes — totals already reflect them</div>}
+          <div className="row gap">
+            <button className="btn primary small grow" disabled={!dirty || !activeId || saving} onClick={onSave}>Save</button>
+            <button className="btn small grow" disabled={saving} onClick={onSaveAs} data-testid="save-as">Save as…</button>
+            <button className="btn ghost small" disabled={!dirty} onClick={onRevert}>Revert</button>
+          </div>
+        </div>
+
+        <div className="pgroup compare">
+          <label className="label" htmlFor="compare-select">Compare with</label>
+          <select id="compare-select" className="select" value={compareId} onChange={(e) => onCompare(e.target.value)} data-testid="compare-select">
+            <option value="">No comparison</option>
+            {saved.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === activeId ? ' (saved version)' : ''}</option>)}
+          </select>
+          {compare && (
+            <table className="delta-table" data-testid="compare-table">
+              <thead><tr><th /><th>This</th><th title={compareName}>Other</th><th>Δ</th></tr></thead>
+              <tbody>
+                {([
+                  ['Poles', current.poleCount, compare.poleCount, (x: number) => String(Math.round(x))],
+                  ['Pole $', current.poleValue, compare.poleValue, (x: number) => money(x)],
+                  ['Sawlog $', current.sawlogValue, compare.sawlogValue, (x: number) => money(x)],
+                  ['Total $', current.totalValue, compare.totalValue, (x: number) => money(x)],
+                ] as const).map(([k, a, b, f]) => (
+                  <tr key={k} className={k === 'Total $' ? 'strong' : ''}>
+                    <td>{k}</td><td>{f(a)}</td><td>{f(b)}</td>
+                    <td className={a - b > 0.004 ? 'up' : a - b < -0.004 ? 'down' : ''}>{Math.abs(a - b) < 0.005 ? '—' : signed(a - b, f)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <details className="pgroup" open>
+          <summary>Pole prices <span className="muted">($/piece + $/m × length)</span></summary>
+          <table className="ptable">
+            <thead><tr><th>Class</th><th>$/piece</th><th>$/m</th></tr></thead>
+            <tbody>
+              {spec.classes.map((c) => {
+                const p = scenario.polePrices[c.name] ?? { perPiece: 0, perMetre: 0 };
+                const setP = (patch: Partial<typeof p>) => onChange({ ...scenario, polePrices: { ...scenario.polePrices, [c.name]: { ...p, ...patch } } });
+                return (
+                  <tr key={c.name}>
+                    <td>{c.name}</td>
+                    <td><input className="input" type="number" min={0} value={p.perPiece} onChange={(e) => setP({ perPiece: n(e.target.value) })} aria-label={`${c.name} price per piece`} data-testid={`pole-piece-${c.name}`} /></td>
+                    <td><input className="input" type="number" min={0} step={0.5} value={p.perMetre} onChange={(e) => setP({ perMetre: n(e.target.value) })} aria-label={`${c.name} price per metre`} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
+
+        <details className="pgroup" open>
+          <summary>Sawlog $/m³ by species</summary>
+          <div className="saw-grid">
+            {SPECIES.filter((s) => s.conifer || scenario.sawlogPricePerM3[s.code] !== undefined).map((s) => (
+              <label key={s.code} className="saw-item" title={s.name}>
+                <span className="dot" style={{ background: SPECIES_COLORS[s.code] }} /><span className="code">{s.code}</span>
+                <input className="input" type="number" min={0} value={scenario.sawlogPricePerM3[s.code] ?? 0}
+                  onChange={(e) => onChange({ ...scenario, sawlogPricePerM3: { ...scenario.sawlogPricePerM3, [s.code]: n(e.target.value) } })}
+                  aria-label={`${s.name} sawlog price per cubic metre`} data-testid={`saw-${s.code}`} />
+              </label>
+            ))}
+          </div>
+          <label className="row between deduct">
+            <span>Defect deduction</span>
+            <span className="row"><input className="input" type="number" min={0} max={100} value={Math.round(scenario.defectDeduction * 100)}
+              onChange={(e) => onChange({ ...scenario, defectDeduction: Math.min(100, n(e.target.value)) / 100 })} aria-label="Defect deduction percent" />&nbsp;%</span>
+          </label>
+        </details>
+
+        <details className="pgroup">
+          <summary>Pole spec thresholds</summary>
+          <div className="spec-species">
+            {SPECIES.filter((s) => s.conifer).map((s) => {
+              const on = spec.species.includes(s.code);
+              return (
+                <button key={s.code} type="button" className={`chip${on ? ' on' : ''}`} title={s.name}
+                  onClick={() => setSpec({ species: on ? spec.species.filter((c) => c !== s.code) : [...spec.species, s.code as SpeciesCode] })}>
+                  <span className="dot" style={{ background: SPECIES_COLORS[s.code] }} />{s.code}
+                </button>
+              );
+            })}
+          </div>
+          <div className="spec-mins">
+            <label>Min length m<input className="input" type="number" min={0} value={spec.minLengthM} onChange={(e) => setSpec({ minLengthM: n(e.target.value) })} /></label>
+            {([['minStraightness', 'Straight ≥'], ['minTwist', 'Twist ≥'], ['minBranchiness', 'Branch ≥']] as const).map(([k, l]) => (
+              <label key={k}>{l}
+                <select className="select" value={spec[k]} onChange={(e) => setSpec({ [k]: Number(e.target.value) as Scale })} data-testid={`spec-${k}`}>
+                  {[1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+          <table className="ptable">
+            <thead><tr><th>Class</th><th>Min DBH cm</th><th>Min len m</th></tr></thead>
+            <tbody>
+              {spec.classes.map((c, i) => (
+                <tr key={c.name}>
+                  <td>{c.name}</td>
+                  <td><input className="input" type="number" min={0} value={c.minDbhCm}
+                    onChange={(e) => setSpec({ classes: spec.classes.map((x, j) => (j === i ? { ...x, minDbhCm: n(e.target.value) } : x)) })} /></td>
+                  <td><input className="input" type="number" min={0} value={c.minLengthM}
+                    onChange={(e) => setSpec({ classes: spec.classes.map((x, j) => (j === i ? { ...x, minLengthM: n(e.target.value) } : x)) })} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted small">Placeholder spec until buyer specs are confirmed.</p>
+        </details>
+      </div>
+    </aside>
+  );
+}
