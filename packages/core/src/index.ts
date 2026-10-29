@@ -2,8 +2,8 @@
 // apps/web and apps/field; implementations live in the sibling modules.
 export * from './types';
 export { SPECIES, SPECIES_COLORS, speciesByCode, speciesName } from './species';
-export { parseUtterance, mergeDraft, missingFields, REQUIRED_FIELDS } from './parser';
-export { readbackText, tagSpeech } from './readback';
+export { parseUtterance, mergeDraft, missingFields, REQUIRED_FIELDS, type ParseOptions } from './parser';
+export { readbackText, tagSpeech, speakGirth, speakHeight, type ReadbackOptions } from './readback';
 export { formatTag, nextTagNumber } from './tags';
 export { evaluatePole } from './pole';
 export { treeVolumeM3, DEFAULT_VOLUME_COEFFICIENTS } from './volume';
@@ -20,7 +20,7 @@ export {
   totalHeightFromMerch,
 } from './taper';
 export type { BecZone, KozakTreeVolume } from './taper';
-export { valueTree, summarize, DEFAULT_SCENARIO } from './value';
+export { valueTree, summarize, hasPrices, normalizeScenario, DEFAULT_SCENARIO } from './value';
 export { averageFixes } from './gps';
 export { heightFromAngles } from './clinometer';
 export { canonicalJson, hashEvent, verifyChain, makeEvent, foldEvents, foldAll } from './events';

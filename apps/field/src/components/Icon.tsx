@@ -28,6 +28,8 @@ const PATHS: Record<string, string> = {
   chevronDown: 'm6 9 6 6 6-6',
   alert: 'M12 3 2 20h20L12 3Zm0 6v5m0 3h.01',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  image: 'M4 5h16v14H4V5Zm0 11 5-5 4 4 3-3 4 4M15 9h.01',
 };
 
 export function Icon({ name, size = 24, stroke = 2.2 }: { name: keyof typeof PATHS | string; size?: number; stroke?: number }) {

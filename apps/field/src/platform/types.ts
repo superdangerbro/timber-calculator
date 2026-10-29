@@ -71,6 +71,17 @@ export interface TileRegion {
   createdAt: string;
 }
 
+/** A photo's bytes kept on the phone, keyed by the photo id used in tree events. */
+export interface StoredPhoto {
+  id: string;
+  treeId: string;
+  type: string; // e.g. image/jpeg
+  data: ArrayBuffer;
+  sha256: string;
+  /** True once the server has the bytes (or they were downloaded from it). */
+  synced: boolean;
+}
+
 /** Local persistence: events, blocks, settings, offline tile index, sync cursor. */
 export interface LocalStore {
   init(): Promise<void>;
@@ -92,6 +103,11 @@ export interface LocalStore {
   deleteRegion(id: string): Promise<void>;
   putTile(regionId: string, key: string, data: ArrayBuffer): Promise<void>;
   getTile(key: string): Promise<ArrayBuffer | undefined>;
+  // Tree photos (bytes; the metadata lives in tree events).
+  putPhoto(photo: StoredPhoto): Promise<void>;
+  getPhoto(id: string): Promise<StoredPhoto | undefined>;
+  unsyncedPhotos(): Promise<StoredPhoto[]>;
+  markPhotoSynced(id: string): Promise<void>;
 }
 
 /** On-device LLM fallback for utterances the rule parser does not understand. */

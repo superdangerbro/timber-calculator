@@ -104,9 +104,13 @@ export function TreeTable({ rows, dupTags, selectedIds, onRowClick, onToggle, on
           ? <span className="sp"><span className="dot" style={{ background: SPECIES_COLORS[r.tree.species as SpeciesCode] }} />{r.tree.species}</span>
           : <span className="muted">—</span>)(c.row.original),
       }),
+      col.accessor((r) => r.tree.circumferenceCm ?? 0, {
+        id: 'circ', header: 'Circ cm', meta: { align: 'r' },
+        cell: (c) => ed('circumferenceCm', 'number', 'Circumference', (r) => num(r.tree.circumferenceCm, 1))(c.row.original),
+      }),
       col.accessor((r) => r.tree.dbhCm ?? 0, {
         id: 'dbh', header: 'DBH cm', meta: { align: 'r' },
-        cell: (c) => ed('dbhCm', 'number', 'DBH', (r) => num(r.tree.dbhCm, 0))(c.row.original),
+        cell: (c) => ed('dbhCm', 'number', 'DBH', (r) => num(r.tree.dbhCm, 1))(c.row.original),
       }),
       col.accessor((r) => r.tree.heightM ?? 0, {
         id: 'height', header: 'Ht m', meta: { align: 'r' },
@@ -121,7 +125,7 @@ export function TreeTable({ rows, dupTags, selectedIds, onRowClick, onToggle, on
       }),
       col.accessor((r) => r.val.poleClass ?? '', { id: 'poleClass', header: 'Class', cell: (c) => c.getValue() ? String(c.getValue()).replace('Class ', 'C') : <span className="muted">—</span> }),
       col.accessor((r) => r.val.volumeM3, { id: 'volume', header: 'Vol m³', meta: { align: 'r' }, cell: (c) => num(c.getValue(), 2) }),
-      col.accessor((r) => r.val.value, { id: 'value', header: 'Value', meta: { align: 'r' }, cell: (c) => <b className="money">{money(c.getValue())}</b> }),
+      col.accessor((r) => r.val.value, { id: 'value', header: 'Value', meta: { align: 'r' }, cell: (c) => { const v = c.row.original.val; return v.product === 'none' ? <span className="muted">—</span> : !v.priced ? <span className="muted" title="No $/m³ set for this product">—</span> : <b className="money">{money(c.getValue())}</b>; } }),
       col.accessor((r) => r.tree.status, {
         id: 'status', header: 'Status',
         cell: (c) => ed('status', 'status', 'Status', (r) => <span className={`status st-${r.tree.status}`}>{r.tree.status}</span>)(c.row.original),

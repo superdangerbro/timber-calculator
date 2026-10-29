@@ -408,3 +408,18 @@ html:has(.report), body:has(.report) { background: #e9eeea; }
 .dup-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; padding: 2px 5px; border-radius: 4px; background: #ff5d5d; color: #1a0505; }
 .dup-btn { background: rgba(255, 93, 93, 0.14); border-color: #ff5d5d; color: #ffb3b3; }
 .dup-btn.on { background: #ff5d5d; color: #1a0505; }
+
+/* Photos */
+.pop-photos { display: flex; gap: 6px; margin: 2px 0 10px; overflow-x: auto; }
+.pop-photo, .hist-photo { padding: 0; border: 1px solid var(--line, #2d5a45); border-radius: 8px; overflow: hidden; background: #0b1f15; cursor: zoom-in; flex: none; }
+.pop-photo img { display: block; width: 120px; height: 90px; object-fit: cover; }
+.pop-photos .pop-photo:first-child img { width: 252px; height: 140px; }
+.hist-photos { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.hist-photo img { display: block; width: 150px; height: 112px; object-fit: cover; }
+.lightbox { position: fixed; inset: 0; z-index: 1000; background: rgba(2, 10, 6, 0.92); display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.lightbox img { max-width: 94vw; max-height: 92vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); }
+.lightbox .btn { position: absolute; top: 16px; right: 16px; }
+.pop-grid b.muted, .v.muted { color: var(--muted); }
+.stat.unpriced .v { font-size: 22px; }
+.stat .sub.warn { color: #fbbf24; }
+.price-hint { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 107, 26, 0.12); border: 1px solid rgba(255, 107, 26, 0.45); color: #ffd3b8; font-size: 13px; }

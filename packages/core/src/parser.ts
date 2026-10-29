@@ -8,7 +8,7 @@
 // is never interpreted twice (e.g. the 20 in "fork at twenty" belongs to the
 // defect, never to height or DBH).
 
-import type { ParseResult, Scale, SpeciesCode, TreeFields, VoiceCommand } from './types';
+import type { ParseResult, Scale, SpeciesCode, TreeFields, UnitSystem, VoiceCommand } from './types';
 import { SPECIES } from './species';
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,20 @@ interface Tok {
   used: boolean;
 }
 
-type NumericField = 'dbhCm' | 'heightM' | 'straightness' | 'twist' | 'branchiness';
+type NumericField = 'dbhCm' | 'circumferenceCm' | 'heightM' | 'straightness' | 'twist' | 'branchiness';
+
+export interface ParseOptions {
+  /**
+   * Units assumed for numbers said without a unit ("dbh 24", "circ 75", "ninety eight tall").
+   * Default 'metric' (cm and m). Spoken units ("inches", "feet", "cm") always win.
+   */
+  units?: UnitSystem;
+  /**
+   * What a bare girth number means: 'dbh' (default) or 'circumference' for cruisers who
+   * tape the circumference at breast height. "diameter"/"dbh" said aloud still means DBH.
+   */
+  measure?: 'dbh' | 'circumference';
+}
 
 interface Assignment {
   field: NumericField;
@@ -38,6 +51,8 @@ interface Ctx {
   notes: string[];
   command: VoiceCommand | null;
   assignments: Assignment[];
+  units: UnitSystem;
+  measure: 'dbh' | 'circumference';
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +89,9 @@ const SCALE_SKIP = new Set([
 ]);
 
 const DBH_KEYS = new Set(['dbh', 'diameter', 'diametre', 'diam', 'dia']);
+const CIRC_KEYS = new Set([
+  'circumference', 'circumferance', 'circumfrence', 'circumferences', 'circ', 'circum', 'girth', 'circumf',
+]);
 const HEIGHT_KEYS = new Set(['height', 'heights', 'hight', 'length']);
 const HEIGHT_TRAIL = new Set(['tall', 'high', 'long', 'height']);
 const KEY_SKIP = new Set([
@@ -113,6 +131,9 @@ const COMMANDS: { words: string[]; cmd: VoiceCommand }[] = (
     [['measure', 'the', 'height'], 'measure_height'], [['measure', 'height'], 'measure_height'],
     [['cancel', 'that'], 'cancel'], [['cancel', 'tree'], 'cancel'], [['cancel'], 'cancel'],
     [['never', 'mind'], 'cancel'], [['nevermind'], 'cancel'], [['forget', 'it'], 'cancel'],
+    [['take', 'a', 'photo'], 'photo'], [['take', 'a', 'picture'], 'photo'], [['take', 'photo'], 'photo'],
+    [['take', 'picture'], 'photo'], [['snap', 'a', 'photo'], 'photo'], [['add', 'a', 'photo'], 'photo'],
+    [['photo'], 'photo'], [['picture'], 'photo'], [['camera'], 'photo'],
     [['next', 'tree'], 'new_tree'], [['new', 'tree'], 'new_tree'], [['next', 'one'], 'new_tree'],
   ] as [string[], VoiceCommand][]
 )
@@ -331,9 +352,27 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+/** Convert a girth said without a unit to cm under the default units. */
+function girthCm(ctx: Ctx, v: number): number {
+  return ctx.units === 'imperial' ? round1(v * 2.54) : v;
+}
+/** Convert a height said without a unit to m under the default units. */
+function heightM(ctx: Ctx, v: number): number {
+  return ctx.units === 'imperial' ? round1(v * 0.3048) : v;
+}
+/** The field a girth number goes to when nothing in the utterance says which. */
+function girthField(ctx: Ctx): NumericField {
+  return ctx.measure === 'circumference' ? 'circumferenceCm' : 'dbhCm';
+}
+
 function assign(ctx: Ctx, field: NumericField, value: number, idx: number) {
-  if (field === 'dbhCm') ctx.fields.dbhCm = value;
-  else if (field === 'heightM') {
+  if (field === 'dbhCm') {
+    ctx.fields.dbhCm = value;
+    delete ctx.fields.circumferenceCm;
+  } else if (field === 'circumferenceCm') {
+    ctx.fields.circumferenceCm = value;
+    ctx.fields.dbhCm = round1(value / Math.PI);
+  } else if (field === 'heightM') {
     ctx.fields.heightM = value;
     ctx.fields.heightSource = 'spoken';
   } else ctx.fields[field] = value as Scale;
@@ -591,8 +630,10 @@ function passExplicit(ctx: Ctx) {
     const t = toks[i];
     if (!free(t)) continue;
     const isDbh = DBH_KEYS.has(t.w);
+    const isCirc = CIRC_KEYS.has(t.w);
     const isHeight = HEIGHT_KEYS.has(t.w);
-    if (!isDbh && !isHeight) continue;
+    if (!isDbh && !isHeight && !isCirc) continue;
+    const girth: NumericField = isCirc ? 'circumferenceCm' : 'dbhCm';
     const j = nextAfter(toks, i, KEY_SKIP, 4);
     const n = toks[j];
     if (free(n) && isNum(n)) {
@@ -600,18 +641,28 @@ function passExplicit(ctx: Ctx) {
       let end = u.end;
       if (isHeight && free(toks[end]) && HEIGHT_TRAIL.has(toks[end].w)) end++;
       // A unit can override the keyword ("diameter ... 30 metres" is odd; trust the keyword unless unit is clearly the other kind).
-      const field: NumericField = u.kind === 'm' || u.kind === 'ft' ? 'heightM' : u.kind === 'cm' || u.kind === 'in' ? 'dbhCm' : isDbh ? 'dbhCm' : 'heightM';
+      let field: NumericField;
+      let value = u.value;
+      if (u.kind === 'm' || u.kind === 'ft') field = 'heightM';
+      else if (u.kind === 'cm' || u.kind === 'in') field = isHeight ? 'dbhCm' : girth;
+      else if (isHeight) {
+        field = 'heightM';
+        value = heightM(ctx, n.num);
+      } else {
+        field = girth;
+        value = girthCm(ctx, n.num);
+      }
       useRange(toks, i, end);
-      assign(ctx, field, u.value, j);
+      assign(ctx, field, value, j);
       continue;
     }
     // Backward: "forty two dbh", "42 cm diameter" (cm already handled by unit pass, see below).
     let k = i - 1;
     if (k >= 0 && free(toks[k]) && (CM_UNITS.has(toks[k].w) || INCH_UNITS.has(toks[k].w) || M_UNITS.has(toks[k].w))) k--;
-    if (k >= 0 && free(toks[k]) && isNum(toks[k]) && isDbh) {
+    if (k >= 0 && free(toks[k]) && isNum(toks[k]) && (isDbh || isCirc)) {
       const u = readUnit(toks, k, toks[k].num!);
       useRange(toks, k, i + 1);
-      assign(ctx, 'dbhCm', u.value, k);
+      assign(ctx, girth, u.kind ? u.value : girthCm(ctx, toks[k].num!), k);
     }
   }
   // Units: "forty two cm", "16 inches", "thirty metres (tall)", "ninety feet", "thirty tall".
@@ -621,9 +672,37 @@ function passExplicit(ctx: Ctx) {
     const u = readUnit(toks, i, t.num);
     if (u.kind === 'cm' || u.kind === 'in') {
       let end = u.end;
-      if (free(toks[end]) && DBH_KEYS.has(toks[end].w)) end++;
-      useRange(toks, i, end);
-      assign(ctx, 'dbhCm', u.value, i);
+      let start = i;
+      let field = girthField(ctx);
+      const nxt = toks[end];
+      if (free(nxt) && DBH_KEYS.has(nxt.w)) {
+        field = 'dbhCm';
+        end++;
+      } else if (free(nxt) && (CIRC_KEYS.has(nxt.w) || nxt.w === 'around' || nxt.w === 'round')) {
+        field = 'circumferenceCm';
+        end++;
+      } else {
+        // "around 75 inches": "around" means circumference when the number is too big to be a DBH.
+        const prev = toks[i - 1];
+        const big = u.value >= 76;
+        if (prev && !prev.used && prev.w === 'around' && (ctx.measure === 'circumference' || big)) {
+          field = 'circumferenceCm';
+          start = i - 1;
+        } else {
+          // "no, seventy eight inches": a correction re-sets whichever girth was said last.
+          let m = i - 1;
+          while (m >= 0 && toks[m].comma) m--;
+          const marker = toks[m];
+          if (marker && !marker.used && CORRECTION_MARKERS.has(marker.w)) {
+            const prior = ctx.assignments
+              .filter((a) => a.idx < i && (a.field === 'dbhCm' || a.field === 'circumferenceCm'))
+              .sort((a, b) => b.idx - a.idx)[0];
+            if (prior) field = prior.field;
+          }
+        }
+      }
+      useRange(toks, start, end);
+      assign(ctx, field, u.value, i);
     } else if (u.kind === 'm' || u.kind === 'ft') {
       let end = u.end;
       if (free(toks[end]) && HEIGHT_TRAIL.has(toks[end].w)) end++;
@@ -631,7 +710,7 @@ function passExplicit(ctx: Ctx) {
       assign(ctx, 'heightM', u.value, i);
     } else if (free(toks[i + 1]) && (toks[i + 1].w === 'tall' || toks[i + 1].w === 'high')) {
       useRange(toks, i, i + 2);
-      assign(ctx, 'heightM', t.num, i);
+      assign(ctx, 'heightM', heightM(ctx, t.num), i);
     }
   }
 }
@@ -667,6 +746,7 @@ function passSpecies(ctx: Ctx) {
 
 const PLAUSIBLE: Record<NumericField, [number, number]> = {
   dbhCm: [5, 300],
+  circumferenceCm: [15, 950],
   heightM: [1, 90],
   straightness: [1, 5],
   twist: [1, 5],
@@ -701,26 +781,35 @@ function passBareNumbers(ctx: Ctx) {
       pendingCorrection = false;
       // Replace the last numeric field said before the correction, if the value fits it.
       const prior = ctx.assignments.filter((a) => a.idx < k).sort((a, b) => b.idx - a.idx)[0];
-      if (prior && plausible(prior.field, v)) {
-        t.used = true;
-        assign(ctx, prior.field, v, k);
-        continue;
+      if (prior) {
+        const conv = prior.field === 'heightM' ? heightM(ctx, v) : prior.field === 'dbhCm' || prior.field === 'circumferenceCm' ? girthCm(ctx, v) : v;
+        if (plausible(prior.field, conv)) {
+          t.used = true;
+          assign(ctx, prior.field, conv, k);
+          continue;
+        }
       }
-      if (v >= 10 && v <= 150) {
+      const g = girthCm(ctx, v);
+      const field = girthField(ctx);
+      if (field === 'circumferenceCm' ? plausible(field, g) : g >= 10 && g <= 150) {
         t.used = true;
-        assign(ctx, 'dbhCm', v, k);
+        assign(ctx, field, g, k);
         bareDbhIdx = k;
       }
       continue;
     }
-    if (ctx.fields.dbhCm === undefined && v >= 8 && v <= 250) {
+    const g = girthCm(ctx, v);
+    const gField = girthField(ctx);
+    const girthOk = gField === 'circumferenceCm' ? g >= 25 && g <= 950 : g >= 8 && g <= 250;
+    const h = heightM(ctx, v);
+    if (ctx.fields.dbhCm === undefined && girthOk) {
       t.used = true;
-      assign(ctx, 'dbhCm', v, k);
+      assign(ctx, gField, g, k);
       bareDbhIdx = k;
-    } else if (bareDbhIdx >= 0 && bareDbhIdx < k && ctx.fields.heightM === undefined && v >= 3 && v <= 80) {
+    } else if (bareDbhIdx >= 0 && bareDbhIdx < k && ctx.fields.heightM === undefined && h >= 3 && h <= 80) {
       // "fir forty two thirty": a second bare number after a bare DBH is the height.
       t.used = true;
-      assign(ctx, 'heightM', v, k);
+      assign(ctx, 'heightM', h, k);
     }
   }
 }
@@ -728,9 +817,12 @@ function passBareNumbers(ctx: Ctx) {
 // ---------------------------------------------------------------------------
 // Public API
 
-export function parseUtterance(text: string): ParseResult {
+export function parseUtterance(text: string, opts: ParseOptions = {}): ParseResult {
   const toks = tokenise(text ?? '');
-  const ctx: Ctx = { toks, fields: {}, defects: [], notes: [], command: null, assignments: [] };
+  const ctx: Ctx = {
+    toks, fields: {}, defects: [], notes: [], command: null, assignments: [],
+    units: opts.units ?? 'metric', measure: opts.measure ?? 'dbh',
+  };
 
   passCommands(ctx);
   passNegations(ctx);
@@ -764,9 +856,13 @@ export function parseUtterance(text: string): ParseResult {
   return { fields: ctx.fields, command: ctx.command, unparsed: unparsed.join(' '), confidence };
 }
 
-/** Merge newly parsed fields onto a draft. Later values win; defects are appended ("; "). */
+/**
+ * Merge newly parsed fields onto a draft. Later values win; defects are appended ("; ").
+ * A DBH given without a circumference replaces (clears) an earlier circumference.
+ */
 export function mergeDraft(draft: TreeFields, fields: TreeFields): TreeFields {
   const out: TreeFields = { ...draft };
+  if (fields.dbhCm !== undefined && fields.circumferenceCm === undefined) delete out.circumferenceCm;
   for (const key of Object.keys(fields) as (keyof TreeFields)[]) {
     const v = fields[key];
     if (v === undefined) continue;

@@ -12,6 +12,7 @@ function describe(e: TreeEvent): string {
     const f = (p.fields ?? {}) as Record<string, unknown>;
     return `Created ${p.tag ?? ''}: ` + Object.entries(f).map(([k, v]) => `${k} ${v}`).join(', ');
   }
+  if (e.type === 'update' && Array.isArray(p.photos) && !p.fields) return `Added ${p.photos.length === 1 ? 'a photo' : `${p.photos.length} photos`}`;
   if (e.type === 'update') return 'Changed ' + Object.entries((p.fields ?? {}) as Record<string, unknown>).map(([k, v]) => `${k} → ${v}`).join(', ');
   if (e.type === 'void') return `Voided${p.reason ? `: ${p.reason}` : ''}`;
   if (e.type === 'status') return `Status → ${p.status}${p.stumpDiameterCm ? ` (stump ${p.stumpDiameterCm} cm)` : ''}`;
@@ -43,6 +44,15 @@ export function HistoryModal({ tree, users, onClose, version }: { tree: Tree; us
               : <span className="badge bad" data-testid="chain-broken">✕ Chain broken at {data.verification.brokenAt?.slice(0, 8)}</span>}
             <span className="muted">{data.events.length} events · hash-chained per device, recomputed on the server</span>
           </div>
+          {!!tree.photos?.length && (
+            <div className="hist-photos" data-testid="history-photos">
+              {tree.photos.map((ph) => (
+                <button key={ph.id} type="button" className="hist-photo" data-photo={ph.id} title={`Taken ${shortDate(ph.takenAt)} · sha256 ${ph.sha256.slice(0, 12)}…`}>
+                  <img src={`/api/photos/${ph.id}`} alt={`Photo of ${tree.tag}`} loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
           <ol className="timeline" data-testid="history-list">
             {data.events.map((e) => {
               const u = users.get(e.userId);

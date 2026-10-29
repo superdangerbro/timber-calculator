@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  DEFAULT_SCENARIO, SPECIES_COLORS, polygonAreaHa, speciesName, summarize, treesInArea, valueTree,
+  DEFAULT_SCENARIO, SPECIES_COLORS, hasPrices, polygonAreaHa, speciesName, summarize, treesInArea, valueTree,
   type Block, type Scenario, type SpeciesCode, type Tree, type UserProfile,
 } from '@timber/core';
 import { LogoMark } from '../Logo';
@@ -109,6 +109,8 @@ export function Report({ me }: { me: { name: string } }) {
   if (err) return <div className="report"><p>{err}</p></div>;
   if (!data || !calc) return <div className="report"><p>Preparing report…</p></div>;
   const { state, users } = data; const { summary, areaHa, list, vals } = calc;
+  const priced = hasPrices(state.scenario);
+  const cash = (n: number) => (priced ? money(n) : '—');
   const fdesc = describeFilters(state.filters, users);
 
   return (
@@ -128,10 +130,10 @@ export function Report({ me }: { me: { name: string } }) {
 
       <section className="rep-kpis">
         <div><span>Trees</span><b data-testid="report-trees">{summary.treeCount}</b><small>{summary.leaveTreeCount} leave</small></div>
-        <div><span>Poles</span><b>{summary.poleCount}</b><small>{money(summary.poleValue)}</small></div>
-        <div><span>Sawlog volume</span><b>{num(Object.values(summary.sawlogM3BySpecies).reduce((a, b) => a + (b ?? 0), 0), 1)} m³</b><small>{money(summary.sawlogValue)}</small></div>
+        <div><span>Poles</span><b>{summary.poleCount}</b><small>{cash(summary.poleValue)}</small></div>
+        <div><span>Sawlog volume</span><b>{num(Object.values(summary.sawlogM3BySpecies).reduce((a, b) => a + (b ?? 0), 0), 1)} m³</b><small>{cash(summary.sawlogValue)}</small></div>
         <div><span>Total volume</span><b>{num(summary.totalVolumeM3, 1)} m³</b><small>{areaHa ? `${num(summary.totalVolumeM3 / areaHa, 1)} m³/ha` : ''}</small></div>
-        <div className="hl"><span>Total value</span><b>{money(summary.totalValue)}</b><small>{areaHa ? `${money(summary.totalValue / areaHa)}/ha` : ''}</small></div>
+        <div className="hl"><span>Total value</span><b>{priced ? cash(summary.totalValue) : 'Prices not set'}</b><small>{areaHa ? `${cash(summary.totalValue / areaHa)}/ha` : ''}</small></div>
       </section>
 
       <section className="rep-two">
@@ -146,9 +148,9 @@ export function Report({ me }: { me: { name: string } }) {
             <thead><tr><th>Class</th><th>Spec</th><th className="r">Pieces</th><th className="r">Avg len m</th><th className="r">Value</th></tr></thead>
             <tbody>
               {calc.poleRows.map((r, i) => { const c = state.scenario.poleSpec.classes[i]; return (
-                <tr key={r.name}><td>{r.name}</td><td className="muted">≥{c.minDbhCm} cm, ≥{c.minLengthM} m</td><td className="r">{r.n}</td><td className="r">{r.n ? num(r.len / r.n, 1) : '—'}</td><td className="r">{money(r.value)}</td></tr>
+                <tr key={r.name}><td>{r.name}</td><td className="muted">≥{c.minDbhCm} cm, ≥{c.minLengthM} m</td><td className="r">{r.n}</td><td className="r">{r.n ? num(r.len / r.n, 1) : '—'}</td><td className="r">{cash(r.value)}</td></tr>
               ); })}
-              <tr className="tot"><td colSpan={2}>Total</td><td className="r">{summary.poleCount}</td><td /><td className="r">{money(summary.poleValue)}</td></tr>
+              <tr className="tot"><td colSpan={2}>Total</td><td className="r">{summary.poleCount}</td><td /><td className="r">{cash(summary.poleValue)}</td></tr>
             </tbody>
           </table>
           <h2>By species</h2>
@@ -157,7 +159,7 @@ export function Report({ me }: { me: { name: string } }) {
             <tbody>
               {calc.bySpecies.map(([sp, r]) => (
                 <tr key={sp}><td><i className="sw" style={{ background: SPECIES_COLORS[sp as SpeciesCode] ?? '#999' }} />{sp} <span className="muted">{speciesName(sp)}</span></td>
-                  <td className="r">{r.n}</td><td className="r">{num(r.dbh / r.n, 0)}</td><td className="r">{num(r.ht / r.n, 1)}</td><td className="r">{r.poles}</td><td className="r">{num(r.saw, 1)}</td><td className="r">{money(r.value)}</td></tr>
+                  <td className="r">{r.n}</td><td className="r">{num(r.dbh / r.n, 0)}</td><td className="r">{num(r.ht / r.n, 1)}</td><td className="r">{r.poles}</td><td className="r">{num(r.saw, 1)}</td><td className="r">{cash(r.value)}</td></tr>
               ))}
             </tbody>
           </table>
@@ -167,11 +169,11 @@ export function Report({ me }: { me: { name: string } }) {
       <section>
         <h2>Pricing &amp; filters</h2>
         <p className="rep-small">
-          Sawlog $/m³: {Object.entries(state.scenario.sawlogPricePerM3).map(([k, v]) => `${k} ${v}`).join(' · ')}.{' '}
-          Poles: {state.scenario.poleSpec.classes.map((c) => { const p = state.scenario.polePrices[c.name]; return p ? `${c.name} $${p.perPiece} + $${p.perMetre}/m` : c.name; }).join(' · ')}.{' '}
+          Sawlog $/m³: {Object.entries(state.scenario.sawlogPricePerM3 ?? {}).map(([k, v]) => `${k} ${v}`).join(' · ') || 'not set'}.{' '}
+          Pole $/m³: {Object.entries(state.scenario.polePricePerM3 ?? {}).map(([k, v]) => `${k} ${v}`).join(' · ') || 'not set'}.{' '}
           Pole spec: {state.scenario.poleSpec.species.join('/')} ≥ {state.scenario.poleSpec.minLengthM} m, straightness ≥ {state.scenario.poleSpec.minStraightness}, twist ≥ {state.scenario.poleSpec.minTwist}, branchiness ≥ {state.scenario.poleSpec.minBranchiness}. Defect deduction {Math.round(state.scenario.defectDeduction * 100)}%. Volume: BC Kozak taper equations, {state.scenario.becZone ?? 'ICH'} zone, to a {state.scenario.topDibCm ?? 15} cm top.
         </p>
-        <p className="rep-small">Filters: {activeFilterCount(state.filters) ? fdesc.join(' · ') : 'none (all live trees)'}. Volumes use placeholder Schumacher-Hall coefficients pending BC taper equations.</p>
+        <p className="rep-small">Filters: {activeFilterCount(state.filters) ? fdesc.join(' · ') : 'none (all live trees)'}.</p>
       </section>
 
       <section className="rep-break">
@@ -184,7 +186,7 @@ export function Report({ me }: { me: { name: string } }) {
                 <td className="mono b">{t.tag}</td><td>{t.species ?? '—'}</td><td className="r">{num(t.dbhCm, 0)}</td><td className="r">{num(t.heightM, 1)}</td>
                 <td className="r">{t.straightness ?? '–'}/{t.twist ?? '–'}/{t.branchiness ?? '–'}</td>
                 <td>{t.leaveTree ? 'Leave' : t.voided ? 'Void' : v.product === 'pole' ? `Pole ${v.poleClass?.replace('Class ', 'C')}` : v.product === 'sawlog' ? 'Sawlog' : '—'}</td>
-                <td className="r">{num(v.volumeM3, 2)}</td><td className="r">{money(v.value)}</td><td>{t.status}</td><td>{t.prefix}</td>
+                <td className="r">{num(v.volumeM3, 2)}</td><td className="r">{cash(v.value)}</td><td>{t.status}</td><td>{t.prefix}</td>
               </tr>
             ); })}
           </tbody>

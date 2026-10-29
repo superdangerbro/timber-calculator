@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { SPECIES, SPECIES_COLORS, type Scale, type SpeciesCode, type TreeFields } from '@timber/core';
+import { SPECIES, SPECIES_COLORS, type Scale, type SpeciesCode, type TreeFields, type UnitSystem } from '@timber/core';
+import { dbhFromCirc, girthToCm, girthUnit, heightToM, heightUnit, showGirth, showHeight } from '../lib/units';
 import { Icon } from './Icon';
 
-export type FieldKey = 'species' | 'dbhCm' | 'heightM' | 'straightness' | 'twist' | 'branchiness' | 'defects' | 'leaveTree' | 'notes';
+export type FieldKey = 'species' | 'circumferenceCm' | 'dbhCm' | 'heightM' | 'straightness' | 'twist' | 'branchiness' | 'defects' | 'leaveTree' | 'notes';
 
 export const FIELD_META: Record<FieldKey, { label: string; short: string; unit?: string; kind: 'species' | 'number' | 'scale' | 'text' | 'bool' }> = {
   species: { label: 'Species', short: 'Species', kind: 'species' },
+  circumferenceCm: { label: 'Circumference', short: 'Circumf.', unit: 'cm', kind: 'number' },
   dbhCm: { label: 'DBH', short: 'DBH', unit: 'cm', kind: 'number' },
   heightM: { label: 'Height', short: 'Height', unit: 'm', kind: 'number' },
   straightness: { label: 'Straightness', short: 'Straight', kind: 'scale' },
@@ -34,11 +36,19 @@ export function SpeciesDot({ code, size = 14 }: { code?: string; size?: number }
   return <span className="sp-dot" style={{ width: size, height: size, background: speciesColor(code) }} />;
 }
 
-export function formatField(key: FieldKey, f: TreeFields): string | null {
+/** Unit label for a field under the chosen display units. */
+export function fieldUnit(key: FieldKey, units: UnitSystem = 'metric'): string | undefined {
+  if (key === 'dbhCm' || key === 'circumferenceCm') return girthUnit(units);
+  if (key === 'heightM') return heightUnit(units);
+  return FIELD_META[key].unit;
+}
+
+export function formatField(key: FieldKey, f: TreeFields, units: UnitSystem = 'metric'): string | null {
   const v = f[key as keyof TreeFields];
   if (v === undefined || v === null || v === '') return null;
   if (key === 'leaveTree') return v ? 'Yes' : 'No';
-  if (key === 'dbhCm' || key === 'heightM') return `${Math.round((v as number) * 10) / 10}`;
+  if (key === 'dbhCm' || key === 'circumferenceCm') return `${showGirth(v as number, units)}`;
+  if (key === 'heightM') return `${showHeight(v as number, units)}`;
   return String(v);
 }
 
@@ -64,17 +74,17 @@ export function FieldEditor({
   value,
   onChange,
   onClose,
+  units = 'metric',
 }: {
   field: FieldKey;
   value: TreeFields;
   onChange: (patch: TreeFields) => void;
   onClose: () => void;
+  units?: UnitSystem;
 }) {
   const meta = FIELD_META[field];
-  const [text, setText] = useState(() => {
-    const v = value[field as keyof TreeFields];
-    return v === undefined ? '' : String(v);
-  });
+  const unit = fieldUnit(field, units);
+  const [text, setText] = useState(() => formatField(field, value, units) ?? '');
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (meta.kind === 'number' || meta.kind === 'text') input.current?.focus();
@@ -83,7 +93,19 @@ export function FieldEditor({
   const commitText = () => {
     if (meta.kind === 'number') {
       const n = parseFloat(text.replace(',', '.'));
-      onChange({ [field]: Number.isFinite(n) && n > 0 ? n : undefined, ...(field === 'heightM' && Number.isFinite(n) ? { heightSource: 'estimated' as const } : {}) });
+      const ok = Number.isFinite(n) && n > 0;
+      if (field === 'circumferenceCm') {
+        // DBH is derived from the taped circumference.
+        const c = ok ? girthToCm(n, units) : null;
+        onChange(c ? { circumferenceCm: c, dbhCm: dbhFromCirc(c) } : { circumferenceCm: null });
+      } else if (field === 'dbhCm') {
+        // A DBH typed directly replaces any circumference it came from.
+        onChange({ dbhCm: ok ? girthToCm(n, units) : undefined, circumferenceCm: null });
+      } else if (field === 'heightM') {
+        onChange({ heightM: ok ? heightToM(n, units) : undefined, ...(ok ? { heightSource: 'estimated' as const } : {}) });
+      } else {
+        onChange({ [field]: ok ? n : undefined });
+      }
     } else {
       onChange({ [field]: text.trim() || undefined });
     }
@@ -161,10 +183,19 @@ export function FieldEditor({
               placeholder={meta.kind === 'number' ? '0' : field === 'defects' ? 'e.g. sweep; conk' : ''}
               data-testid={`input-${field}`}
             />
-            {meta.unit && <span className="edit-unit">{meta.unit}</span>}
+            {unit && <span className="edit-unit">{unit}</span>}
           </div>
+          {field === 'circumferenceCm' && (
+            <div className="edit-derived" data-testid="derived-dbh">
+              {(() => {
+                const n = parseFloat(text.replace(',', '.'));
+                if (!Number.isFinite(n) || n <= 0) return 'DBH is worked out from the circumference (C ÷ π).';
+                return `DBH ${showGirth(dbhFromCirc(girthToCm(n, units)), units)} ${unit}`;
+              })()}
+            </div>
+          )}
           <div className="edit-actions">
-            <button type="button" className="btn ghost" onClick={() => { onChange({ [field]: undefined }); onClose(); }}>
+            <button type="button" className="btn ghost" onClick={() => { onChange(field === 'circumferenceCm' ? { circumferenceCm: null } : { [field]: undefined }); onClose(); }}>
               Clear
             </button>
             <button type="submit" className="btn primary">
@@ -177,7 +208,7 @@ export function FieldEditor({
   );
 }
 
-export const FORM_FIELDS: FieldKey[] = ['species', 'dbhCm', 'heightM', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree'];
+export const FORM_FIELDS: FieldKey[] = ['species', 'circumferenceCm', 'dbhCm', 'heightM', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree'];
 
 /** Grid of big tiles showing a TreeFields; tap a tile to edit. */
 export function FieldGrid({
@@ -185,18 +216,28 @@ export function FieldGrid({
   missing,
   onEdit,
   compact,
+  units = 'metric',
+  measure = 'dbh',
 }: {
   fields: TreeFields;
   missing?: (keyof TreeFields)[];
   onEdit: (k: FieldKey) => void;
   compact?: boolean;
+  units?: UnitSystem;
+  measure?: 'circumference' | 'dbh';
 }) {
   return (
     <div className={compact ? 'field-grid compact' : 'field-grid'}>
       {FORM_FIELDS.map((k) => {
         const meta = FIELD_META[k];
-        const val = formatField(k, fields);
-        const isMissing = missing?.includes(k as keyof TreeFields);
+        const val = formatField(k, fields, units);
+        const unit = fieldUnit(k, units);
+        // A taped circumference satisfies "DBH missing" (DBH is derived from it).
+        const girthMissing = !!missing?.includes('dbhCm');
+        const isMissing =
+          k === 'circumferenceCm' ? measure === 'circumference' && girthMissing
+          : k === 'dbhCm' ? measure !== 'circumference' && girthMissing
+          : missing?.includes(k as keyof TreeFields);
         const wide = k === 'defects';
         return (
           <button
@@ -217,8 +258,9 @@ export function FieldGrid({
               ) : val ? (
                 <>
                   <span className={k === 'defects' ? 'defects-text' : ''}>{val}</span>
-                  {meta.unit && <span className="unit">{meta.unit}</span>}
+                  {unit && <span className="unit">{unit}</span>}
                   {k === 'heightM' && fields.heightSource === 'clinometer' && <span className="src">clino</span>}
+                  {k === 'dbhCm' && fields.circumferenceCm ? <span className="src">calc</span> : null}
                 </>
               ) : isMissing ? (
                 <span className="missing-text">missing</span>

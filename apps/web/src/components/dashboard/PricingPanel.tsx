@@ -1,6 +1,14 @@
 'use client';
-import { BEC_ZONES, DEFAULT_BEC_ZONE, DEFAULT_TOP_DIB_CM, SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
+import { hasPrices, BEC_ZONES, DEFAULT_BEC_ZONE, DEFAULT_TOP_DIB_CM, SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
 import { money, signed } from '@/lib/format';
+
+/** Set or clear one $/m³ entry (an empty box means "not set", not $0). */
+function setPrice<K extends string>(map: Partial<Record<K, number>>, key: K, raw: string): Record<K, number> {
+  const next = { ...map } as Record<K, number>;
+  if (raw.trim() === '') delete next[key];
+  else next[key] = Math.max(0, Number(raw));
+  return next;
+}
 
 export function PricingPanel({
   scenario, onChange, saved, activeId, onSelect, dirty, onSave, onSaveAs, onRevert, saving,
@@ -68,34 +76,31 @@ export function PricingPanel({
           )}
         </div>
 
+        {!hasPrices(scenario) && (
+          <p className="price-hint" data-testid="price-hint">Enter your $/m³ below. Until then the app shows volumes and pole/sawlog counts only.</p>
+        )}
         <details className="pgroup" open>
-          <summary>Pole prices <span className="muted">($/piece + $/m × length)</span></summary>
-          <table className="ptable">
-            <thead><tr><th>Class</th><th>$/piece</th><th>$/m</th></tr></thead>
-            <tbody>
-              {spec.classes.map((c) => {
-                const p = scenario.polePrices[c.name] ?? { perPiece: 0, perMetre: 0 };
-                const setP = (patch: Partial<typeof p>) => onChange({ ...scenario, polePrices: { ...scenario.polePrices, [c.name]: { ...p, ...patch } } });
-                return (
-                  <tr key={c.name}>
-                    <td>{c.name}</td>
-                    <td><input className="input" type="number" min={0} value={p.perPiece} onChange={(e) => setP({ perPiece: n(e.target.value) })} aria-label={`${c.name} price per piece`} data-testid={`pole-piece-${c.name}`} /></td>
-                    <td><input className="input" type="number" min={0} step={0.5} value={p.perMetre} onChange={(e) => setP({ perMetre: n(e.target.value) })} aria-label={`${c.name} price per metre`} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <summary>Pole $/m³ <span className="muted">(gross volume, by class)</span></summary>
+          <div className="saw-grid">
+            {spec.classes.map((c) => (
+              <label key={c.name} className="saw-item" title={`${c.name}: DBH ≥ ${c.minDbhCm} cm, length ≥ ${c.minLengthM} m`}>
+                <span className="code">{c.name.replace('Class ', 'C')}</span>
+                <input className="input" type="number" min={0} placeholder="$/m³" value={scenario.polePricePerM3?.[c.name] ?? ''}
+                  onChange={(e) => onChange({ ...scenario, polePricePerM3: setPrice(scenario.polePricePerM3 ?? {}, c.name, e.target.value) })}
+                  aria-label={`${c.name} pole price per cubic metre`} data-testid={`pole-m3-${c.name}`} />
+              </label>
+            ))}
+          </div>
         </details>
 
         <details className="pgroup" open>
-          <summary>Sawlog $/m³ by species</summary>
+          <summary>Sawlog $/m³ <span className="muted">(net volume, by species)</span></summary>
           <div className="saw-grid">
             {SPECIES.filter((s) => s.conifer || scenario.sawlogPricePerM3[s.code] !== undefined).map((s) => (
               <label key={s.code} className="saw-item" title={s.name}>
                 <span className="dot" style={{ background: SPECIES_COLORS[s.code] }} /><span className="code">{s.code}</span>
-                <input className="input" type="number" min={0} value={scenario.sawlogPricePerM3[s.code] ?? 0}
-                  onChange={(e) => onChange({ ...scenario, sawlogPricePerM3: { ...scenario.sawlogPricePerM3, [s.code]: n(e.target.value) } })}
+                <input className="input" type="number" min={0} placeholder="$/m³" value={scenario.sawlogPricePerM3[s.code] ?? ''}
+                  onChange={(e) => onChange({ ...scenario, sawlogPricePerM3: setPrice(scenario.sawlogPricePerM3, s.code, e.target.value) })}
                   aria-label={`${s.name} sawlog price per cubic metre`} data-testid={`saw-${s.code}`} />
               </label>
             ))}

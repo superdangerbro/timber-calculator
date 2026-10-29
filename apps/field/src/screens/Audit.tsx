@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { tagSpeech, type TreeStatus } from '@timber/core';
 import { useApp } from '../app';
+import { girthText } from '../lib/units';
 import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
 import { GpsChip } from '../components/chips';
@@ -139,7 +140,7 @@ export function AuditScreen() {
                 {sel.t.tag}
               </div>
               <div className="audit-sub">
-                <SpeciesDot code={sel.t.species} /> {speciesLabel(sel.t.species)} · {sel.t.dbhCm ?? '—'} cm
+                <SpeciesDot code={sel.t.species} /> {speciesLabel(sel.t.species)} · {girthText(sel.t.dbhCm, repo.settings.units)}
               </div>
               <div className="audit-dist">
                 {sel.d == null ? 'no GPS' : `${sel.d < 1000 ? sel.d.toFixed(0) + ' m' : (sel.d / 1000).toFixed(2) + ' km'} ${compassPoint(sel.b ?? 0)}`}

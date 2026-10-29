@@ -4,8 +4,10 @@ import { BEC_ZONES } from '@timber/core';
 const money = z.number().min(0).max(1_000_000);
 export const scenarioBody = z.object({
   name: z.string().min(1).max(100),
-  polePrices: z.record(z.object({ perPiece: money, perMetre: money })),
-  sawlogPricePerM3: z.record(money),
+  // All prices are $/m³. Legacy per-piece `polePrices` is accepted and dropped.
+  polePricePerM3: z.record(money).default({}),
+  polePrices: z.unknown().optional(),
+  sawlogPricePerM3: z.record(money).default({}),
   poleSpec: z.object({
     species: z.array(z.string()),
     minLengthM: z.number().min(0).max(80),
@@ -18,4 +20,4 @@ export const scenarioBody = z.object({
   topDibCm: z.number().min(5).max(60).optional(),
   volumeCoefficients: z.record(z.object({ a: z.number(), b: z.number(), c: z.number() })).optional(),
   defectDeduction: z.number().min(0).max(1),
-}).passthrough();
+}).passthrough().transform(({ polePrices: _legacy, ...rest }) => rest);

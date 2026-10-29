@@ -71,6 +71,22 @@ function gridData(center: [number, number]): { fine: GeoJSON.FeatureCollection; 
 
 const fc = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features });
 
+/** Keep a tree popup (which can be tall with a photo) inside the map: cap its height, then pan it into view. */
+function fitPopup(map: MLMap, popup: maplibregl.Popup) {
+  const box = map.getContainer().getBoundingClientRect();
+  const content = popup.getElement().querySelector<HTMLElement>('.maplibregl-popup-content');
+  if (content) { content.style.maxHeight = `${Math.max(160, box.height - 40)}px`; content.style.overflowY = 'auto'; }
+  // Measured a frame later: the popup is placed and the click's own map handling is done by then.
+  setTimeout(() => {
+    if (!popup.isOpen()) return;
+    const r = popup.getElement().getBoundingClientRect();
+    const pad = 12;
+    const dy = r.top < box.top + pad ? r.top - box.top - pad : r.bottom > box.bottom - pad ? r.bottom - box.bottom + pad : 0;
+    const dx = r.left < box.left + pad ? r.left - box.left - pad : r.right > box.right - pad ? r.right - box.right + pad : 0;
+    if (dx || dy) map.panBy([dx, dy], { duration: 250 });
+  }, 50);
+}
+
 export default function MapView(props: MapViewProps) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
@@ -78,6 +94,7 @@ export default function MapView(props: MapViewProps) {
   const propsRef = useRef(props);
   propsRef.current = props;
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const popupTreeRef = useRef<string | null>(null);
   const labelMarkers = useRef<maplibregl.Marker[]>([]);
   const blockMarkers = useRef<maplibregl.Marker[]>([]);
   const gridCenter = useRef<string>('');
@@ -149,6 +166,8 @@ export default function MapView(props: MapViewProps) {
           popupRef.current?.remove();
           popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', offset: 10 })
             .setLngLat([t.lon, t.lat]).setHTML(p.popupHtml(t)).addTo(map);
+          popupTreeRef.current = t.id;
+          fitPopup(map, popupRef.current);
         }
       });
       map.on('dblclick', (e) => { if (propsRef.current.drawing) { e.preventDefault(); propsRef.current.onDrawFinish(); } });
@@ -251,6 +270,8 @@ export default function MapView(props: MapViewProps) {
     const map = mapRef.current; if (!map || !ready || !props.focusId) return;
     const t = props.trees.find((x) => x.tree.id === props.focusId)?.tree;
     if (!t) return;
+    // Clicked on the map: the popup has already been panned into view.
+    if (popupTreeRef.current === t.id && popupRef.current?.isOpen()) return;
     const b = map.getBounds();
     const pad = 0.15; const dx = (b.getEast() - b.getWest()) * pad; const dy = (b.getNorth() - b.getSouth()) * pad;
     const inside = t.lon > b.getWest() + dx && t.lon < b.getEast() - dx && t.lat > b.getSouth() + dy && t.lat < b.getNorth() - dy;

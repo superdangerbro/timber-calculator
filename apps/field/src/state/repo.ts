@@ -12,8 +12,10 @@ import {
   type TreeEvent,
   type TreeEventType,
   type TreeFields,
+  type TreePhoto,
   type TreeStatus,
 } from '@timber/core';
+import { blobBytes, sha256Hex } from '../lib/photo';
 import { Emitter } from '../lib/emitter';
 import type { LocalStore, StoredEvent } from '../platform/types';
 import { defaultSettings, type Settings } from './settings';
@@ -27,6 +29,8 @@ export interface RepoState {
   unsyncedCount: number;
   /** Trees on this device whose tag is also held by an earlier tree elsewhere. */
   clashes: TagClash[];
+  /** Bumped when photo bytes are added locally (so thumbnails refresh). */
+  photoVersion: number;
 }
 
 export interface TagClash {
@@ -93,6 +97,7 @@ export class Repo extends Emitter<RepoState> {
       settings: defaultSettings(''),
       unsyncedCount: 0,
       clashes: [],
+      photoVersion: 0,
     });
   }
 
@@ -246,6 +251,33 @@ export class Repo extends Emitter<RepoState> {
       this.state = { ...this.state, settings };
       await this.append(treeId, 'update', { tag, tagNumber, prefix, fields: {}, retaggedFrom: tree.tag });
       return this.tree(treeId)!;
+    });
+  }
+
+  /**
+   * Attach a photo (already compressed) to a tree: the bytes go to local storage,
+   * and an append-only `update` event records its id, size, place and sha-256.
+   */
+  addPhoto(
+    treeId: string,
+    photo: { blob: Blob; width: number; height: number; lat?: number | null; lon?: number | null },
+  ): Promise<TreePhoto> {
+    return this.enqueue(async () => {
+      const data = await blobBytes(photo.blob);
+      const meta: TreePhoto = {
+        id: uuid(),
+        takenAt: this.now().toISOString(),
+        lat: photo.lat ?? null,
+        lon: photo.lon ?? null,
+        width: photo.width,
+        height: photo.height,
+        bytes: data.byteLength,
+        sha256: await sha256Hex(data),
+      };
+      await this.store.putPhoto({ id: meta.id, treeId, type: photo.blob.type || 'image/jpeg', data, sha256: meta.sha256, synced: false });
+      await this.append(treeId, 'update', { photos: [meta] });
+      this.setState({ photoVersion: this.state.photoVersion + 1 });
+      return meta;
     });
   }
 

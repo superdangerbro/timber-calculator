@@ -24,6 +24,9 @@ const waitPhase = (ph) => p.waitForFunction((ph) => document.querySelector('.tal
 const say = async (t) => { await tid('type-input').fill(t); await tid('type-input').press('Enter'); await p.waitForTimeout(300); };
 
 await p.goto(FIELD);
+await tid('tab-settings').click();
+await tid('units-metric').click(); // this script talks metric DBH
+await tid('measure-dbh').click();
 await tid('tab-tally').click();
 await p.waitForTimeout(800);
 await tid('talk').click();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCENARIO, DEFAULT_VOLUME_COEFFICIENTS, KOZAK_SPECIES_FOR, evaluatePole, summarize, treeVolumeM3, valueTree } from '../src';
+import { DEFAULT_SCENARIO, DEFAULT_VOLUME_COEFFICIENTS, KOZAK_SPECIES_FOR, evaluatePole, hasPrices, summarize, treeVolumeM3, valueTree } from '../src';
 import type { Scenario, TreeFields } from '../src';
 
 const spec = DEFAULT_SCENARIO.poleSpec;
@@ -64,62 +64,92 @@ describe('treeVolumeM3', () => {
   });
 });
 
+const PRICED: Scenario = {
+  ...DEFAULT_SCENARIO,
+  polePricePerM3: { 'Class 1': 300, 'Class 2': 250, 'Class 3': 200, 'Class 4': 150 },
+  sawlogPricePerM3: { FD: 95, SX: 75 },
+};
+
 describe('valueTree', () => {
-  it('pole-eligible tree is a pole when the pole is worth more', () => {
+  it('default scenario has no prices: pole candidates still show as poles, unpriced', () => {
+    expect(hasPrices(DEFAULT_SCENARIO)).toBe(false);
     const v = valueTree({ id: 't1', ...good }, DEFAULT_SCENARIO);
-    // Class 1: 120 + 14 * 20 = 400; sawlog ~ 1.2 m³ * 95 ≈ 115
     expect(v.product).toBe('pole');
     expect(v.poleClass).toBe('Class 1');
-    expect(v.value).toBe(400);
+    expect(v.value).toBe(0);
+    expect(v.priced).toBe(false);
     expect(v.volumeM3).toBeGreaterThan(0);
   });
-  it('picks the higher product: sawlog wins when pole prices are low', () => {
-    const cheapPoles: Scenario = {
-      ...DEFAULT_SCENARIO,
-      polePrices: { 'Class 1': { perPiece: 1, perMetre: 0 } },
-    };
+  it('pole value = gross m³ × class $/m³', () => {
+    const v = valueTree({ id: 't1', ...good }, PRICED);
+    expect(hasPrices(PRICED)).toBe(true);
+    expect(v.product).toBe('pole');
+    expect(v.priced).toBe(true);
+    expect(v.value).toBeCloseTo(v.volumeM3 * 300, 1);
+  });
+  it('picks the higher product when both are priced: sawlog wins when pole $/m³ is low', () => {
+    const cheapPoles: Scenario = { ...PRICED, polePricePerM3: { 'Class 1': 1 } };
     const v = valueTree({ id: 't1', ...good }, cheapPoles);
     expect(v.product).toBe('sawlog');
     expect(v.poleClass).toBeNull();
     expect(v.value).toBeGreaterThan(1);
   });
+  it('pole price missing: stays a pole candidate even if sawlog is priced', () => {
+    const sawOnly: Scenario = { ...PRICED, polePricePerM3: {} };
+    const v = valueTree({ id: 't1', ...good }, sawOnly);
+    expect(v.product).toBe('pole');
+    expect(v.priced).toBe(false);
+  });
   it('non-pole species is sawlog; defects deduct volume', () => {
     const base = { id: 's', species: 'SX' as const, dbhCm: 40, heightM: 30, straightness: 5 as const, twist: 5 as const, branchiness: 5 as const };
-    const clean = valueTree(base, DEFAULT_SCENARIO);
-    const rotten = valueTree({ ...base, defects: 'rot at the butt' }, DEFAULT_SCENARIO);
+    const clean = valueTree(base, PRICED);
+    const rotten = valueTree({ ...base, defects: 'rot at the butt' }, PRICED);
     expect(clean.product).toBe('sawlog');
     expect(clean.value).toBeCloseTo(clean.volumeM3 * 75, 1);
     expect(rotten.volumeM3).toBeCloseTo(clean.volumeM3 * 0.85, 2);
     expect(rotten.value).toBeLessThan(clean.value);
   });
   it('voided, leave tree and missing data -> none', () => {
-    expect(valueTree({ id: 'a', ...good, voided: true }, DEFAULT_SCENARIO)).toEqual({ treeId: 'a', product: 'none', poleClass: null, volumeM3: 0, value: 0 });
-    expect(valueTree({ id: 'b', ...good, leaveTree: true }, DEFAULT_SCENARIO).product).toBe('none');
-    expect(valueTree({ id: 'c', species: 'FD', dbhCm: 40 }, DEFAULT_SCENARIO).product).toBe('none');
+    expect(valueTree({ id: 'a', ...good, voided: true }, PRICED)).toEqual({ treeId: 'a', product: 'none', poleClass: null, volumeM3: 0, value: 0, priced: true });
+    expect(valueTree({ id: 'b', ...good, leaveTree: true }, PRICED).product).toBe('none');
+    expect(valueTree({ id: 'c', species: 'FD', dbhCm: 40 }, PRICED).product).toBe('none');
   });
 });
 
 describe('summarize', () => {
-  it('totals', () => {
-    const trees = [
-      { id: '1', ...good }, // pole Class 1, 400
-      { id: '2', ...good, dbhCm: 30, heightM: 14 }, // pole Class 3, 70 + 140 = 210
-      { id: '3', species: 'SX' as const, dbhCm: 40, heightM: 30 }, // sawlog
-      { id: '4', species: 'FD' as const, dbhCm: 40, heightM: 30, leaveTree: true },
-      { id: '5', ...good, voided: true },
-    ];
-    const s = summarize(trees, DEFAULT_SCENARIO);
-    const sx = valueTree(trees[2], DEFAULT_SCENARIO);
+  const trees = [
+    { id: '1', ...good }, // pole Class 1
+    { id: '2', ...good, dbhCm: 30, heightM: 14 }, // pole Class 3
+    { id: '3', species: 'SX' as const, dbhCm: 40, heightM: 30 }, // sawlog
+    { id: '4', species: 'FD' as const, dbhCm: 40, heightM: 30, leaveTree: true },
+    { id: '5', ...good, voided: true },
+  ];
+  it('totals with prices', () => {
+    const s = summarize(trees, PRICED);
+    const p1 = valueTree(trees[0], PRICED);
+    const p2 = valueTree(trees[1], PRICED);
+    const sx = valueTree(trees[2], PRICED);
     expect(s.treeCount).toBe(4);
     expect(s.leaveTreeCount).toBe(1);
     expect(s.poleCount).toBe(2);
+    expect(s.sawlogCount).toBe(1);
     expect(s.polesByClass).toEqual({ 'Class 1': 1, 'Class 3': 1 });
-    expect(s.poleValue).toBe(610);
+    expect(s.poleValue).toBeCloseTo(p1.value + p2.value, 2);
+    expect(s.poleM3).toBeCloseTo(p1.volumeM3 + p2.volumeM3, 3);
     expect(s.sawlogM3BySpecies).toEqual({ SX: sx.volumeM3 });
+    expect(s.sawlogM3).toBeCloseTo(sx.volumeM3, 3);
     expect(s.sawlogValue).toBeCloseTo(sx.value, 2);
-    expect(s.totalValue).toBeCloseTo(610 + sx.value, 2);
-    const vol = valueTree(trees[0], DEFAULT_SCENARIO).volumeM3 + valueTree(trees[1], DEFAULT_SCENARIO).volumeM3 + sx.volumeM3;
-    expect(s.totalVolumeM3).toBeCloseTo(vol, 3);
+    expect(s.totalValue).toBeCloseTo(p1.value + p2.value + sx.value, 2);
+    expect(s.totalVolumeM3).toBeCloseTo(p1.volumeM3 + p2.volumeM3 + sx.volumeM3, 3);
+    expect(s.unpricedCount).toBe(0);
+  });
+  it('totals without prices count volume and products, value 0', () => {
+    const s = summarize(trees, DEFAULT_SCENARIO);
+    expect(s.poleCount).toBe(2);
+    expect(s.sawlogCount).toBe(1);
+    expect(s.totalVolumeM3).toBeGreaterThan(0);
+    expect(s.totalValue).toBe(0);
+    expect(s.unpricedCount).toBe(3);
   });
   it('empty', () => {
     expect(summarize([], DEFAULT_SCENARIO).totalValue).toBe(0);

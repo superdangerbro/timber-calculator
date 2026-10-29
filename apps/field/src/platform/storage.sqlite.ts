@@ -1,7 +1,7 @@
 import { CapacitorSQLite, SQLiteConnection, type SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import type { Block, TreeEvent } from '@timber/core';
-import type { LocalStore, StoredEvent, TileRegion } from './types';
+import type { LocalStore, StoredEvent, StoredPhoto, TileRegion } from './types';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS events (
@@ -16,6 +16,15 @@ CREATE TABLE IF NOT EXISTS blocks (id TEXT PRIMARY KEY NOT NULL, json TEXT NOT N
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS regions (id TEXT PRIMARY KEY NOT NULL, json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tiles (key TEXT PRIMARY KEY NOT NULL, region_id TEXT NOT NULL, path TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS photos (
+  id TEXT PRIMARY KEY NOT NULL,
+  tree_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  path TEXT NOT NULL,
+  synced INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS photos_synced ON photos (synced);
 `;
 
 function toBase64(buf: ArrayBuffer): string {
@@ -131,5 +140,39 @@ export class SqliteStore implements LocalStore {
     } catch {
       return undefined;
     }
+  }
+
+  // Photos: JPEG files in the app's data directory, one index row each.
+  async putPhoto(photo: StoredPhoto) {
+    const path = `photos/${photo.id.replace(/[^a-zA-Z0-9-]/g, '_')}.jpg`;
+    await Filesystem.writeFile({ path, data: toBase64(photo.data), directory: Directory.Data, recursive: true });
+    await this.db.run(
+      'INSERT INTO photos (id, tree_id, type, sha256, path, synced) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET synced = MAX(synced, excluded.synced)',
+      [photo.id, photo.treeId, photo.type, photo.sha256, path, photo.synced ? 1 : 0],
+    );
+  }
+  async getPhoto(id: string): Promise<StoredPhoto | undefined> {
+    const r = await this.db.query('SELECT * FROM photos WHERE id = ?', [id]);
+    const row = r.values?.[0];
+    if (!row) return undefined;
+    try {
+      const f = await Filesystem.readFile({ path: row.path, directory: Directory.Data });
+      const data = typeof f.data === 'string' ? fromBase64(f.data) : await (f.data as Blob).arrayBuffer();
+      return { id: row.id, treeId: row.tree_id, type: row.type, sha256: row.sha256, data, synced: !!row.synced };
+    } catch {
+      return undefined;
+    }
+  }
+  async unsyncedPhotos() {
+    const r = await this.db.query('SELECT id FROM photos WHERE synced = 0');
+    const out: StoredPhoto[] = [];
+    for (const row of r.values ?? []) {
+      const p = await this.getPhoto(row.id);
+      if (p) out.push(p);
+    }
+    return out;
+  }
+  async markPhotoSynced(id: string) {
+    await this.db.run('UPDATE photos SET synced = 1 WHERE id = ?', [id]);
   }
 }

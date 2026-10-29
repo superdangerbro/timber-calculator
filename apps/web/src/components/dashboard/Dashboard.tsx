@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
-  DEFAULT_SCENARIO, polygonAreaHa, speciesName, summarize, toCsv, toGeoJson, toKml, treesInArea, valueTree,
+  DEFAULT_SCENARIO, hasPrices, polygonAreaHa, speciesName, summarize, toCsv, toGeoJson, toKml, treesInArea, valueTree,
   type Block, type Scenario, type SpeciesCode, type Tree, type TreeValuation, type UserProfile,
 } from '@timber/core';
 import { AppHeader } from '../AppHeader';
@@ -70,6 +70,15 @@ function DashboardInner({ me }: { me: Me }) {
   const [scrollToId, setScrollToId] = useState<string | null>(null);
   const [historyTree, setHistoryTree] = useState<Tree | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement | null)?.closest?.('[data-photo]') as HTMLElement | null;
+      if (btn?.dataset.photo) setLightbox(btn.dataset.photo);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
   const [voidTree, setVoidTree] = useState<Tree | null>(null);
   const [prompt, setPrompt] = useState<null | 'scenario' | 'block'>(null);
   const [pricingOpen, setPricingOpen] = useState(true);
@@ -167,6 +176,13 @@ function DashboardInner({ me }: { me: Me }) {
   const onEdit: EditFn = useCallback((tree, { field, value }) => {
     if (field === 'status') {
       postEvent(tree, { type: 'status', payload: { status: value } }, { ...tree, status: value as Tree['status'] }, `${tree.tag} marked ${value}`);
+    } else if (field === 'circumferenceCm' && typeof value === 'number') {
+      // DBH is derived from the taped circumference.
+      const fields = { circumferenceCm: value, dbhCm: Math.round((value / Math.PI) * 10) / 10 };
+      postEvent(tree, { type: 'update', payload: { fields } }, { ...tree, ...fields }, `${tree.tag} updated`);
+    } else if (field === 'dbhCm' && tree.circumferenceCm) {
+      // A DBH typed directly replaces the circumference it was derived from.
+      postEvent(tree, { type: 'update', payload: { fields: { dbhCm: value, circumferenceCm: null } } }, { ...tree, dbhCm: value as number, circumferenceCm: undefined }, `${tree.tag} updated`);
     } else {
       postEvent(tree, { type: 'update', payload: { fields: { [field]: value } } }, { ...tree, [field]: value }, `${tree.tag} updated`);
     }
@@ -273,11 +289,13 @@ function DashboardInner({ me }: { me: Me }) {
     return `<div class="pop">
       <div class="pop-top"><span class="tag pop-tag">${escapeHtml(t.tag)}</span>${t.voided ? '<span class="badge bad">VOID</span>' : ''}${t.leaveTree ? '<span class="badge none">Leave</span>' : ''}</div>
       <div class="pop-sp">${escapeHtml(t.species ? `${t.species} · ${speciesName(t.species)}` : 'Species unknown')}</div>
+      ${t.photos?.length ? `<div class="pop-photos">${t.photos.map((ph, i) => `<button type="button" class="pop-photo" data-photo="${escapeHtml(ph.id)}" aria-label="Open photo ${i + 1} of ${escapeHtml(t.tag)}"><img src="/api/photos/${escapeHtml(ph.id)}" alt="Photo of ${escapeHtml(t.tag)}" loading="lazy" data-testid="pop-photo-img"/></button>`).join('')}</div>` : ''}
       <div class="pop-grid">
-        <span>DBH</span><b>${num(t.dbhCm, 0)} cm</b><span>Height</span><b>${num(t.heightM, 1)} m</b>
+        ${t.circumferenceCm ? `<span>Circumf.</span><b>${num(t.circumferenceCm, 1)} cm</b>` : ''}
+        <span>DBH</span><b>${num(t.dbhCm, 1)} cm</b><span>Height</span><b>${num(t.heightM, 1)} m</b>
         <span>Str / Tw / Br</span><b>${sc(t.straightness)} / ${sc(t.twist)} / ${sc(t.branchiness)}</b>
         <span>Product</span><b>${v?.product === 'pole' ? `Pole ${escapeHtml(v.poleClass ?? '')}` : v?.product === 'sawlog' ? 'Sawlog' : '—'}</b>
-        <span>Volume</span><b>${num(v?.volumeM3 ?? 0, 2)} m³</b><span>Value</span><b class="money">${money(v?.value ?? 0)}</b>
+        <span>Volume</span><b>${num(v?.volumeM3 ?? 0, 2)} m³</b><span>Value</span>${!v || v.product === 'none' ? '<b class="muted">—</b>' : !v.priced ? '<b class="muted">prices not set</b>' : `<b class="money">${money(v.value)}</b>`}
         <span>Status</span><b>${escapeHtml(t.status)}</b>
       </div>
       ${t.defects ? `<div class="pop-note">Defects: ${escapeHtml(t.defects)}</div>` : ''}
@@ -307,7 +325,7 @@ function DashboardInner({ me }: { me: Me }) {
         <span className="hdr-block">{area ? <>Area: <b>{area.name}</b></> : 'All trees'}</span>
       </AppHeader>
       <FilterBar filters={filters} onChange={setFilters} speciesPresent={speciesPresent} poleClasses={working.poleSpec.classes.map((c) => c.name)} users={users} />
-      <TotalsBar classOrder={working.poleSpec.classes.map((c) => c.name)} summary={summary} areaHa={areaHa} areaName={area ? area.name : 'All filtered trees'} compare={compareSummary} compareName={compareScenario?.name} />
+      <TotalsBar priced={hasPrices(working)} classOrder={working.poleSpec.classes.map((c) => c.name)} summary={summary} areaHa={areaHa} areaName={area ? area.name : 'All filtered trees'} compare={compareSummary} compareName={compareScenario?.name} />
 
       <div className={`workspace${pricingOpen ? ' with-pricing' : ''}`}>
         <div className="main" ref={mainRef}>
@@ -372,6 +390,12 @@ function DashboardInner({ me }: { me: Me }) {
         )}
       </div>
 
+      {lightbox && (
+        <div className="lightbox" role="dialog" aria-label="Photo" onClick={() => setLightbox(null)} data-testid="lightbox">
+          <img src={`/api/photos/${lightbox}`} alt="Tree photo" />
+          <button className="btn ghost small" aria-label="Close photo">✕</button>
+        </div>
+      )}
       {historyTree && <HistoryModal tree={historyTree} users={userMap} version={historyVersion} onClose={() => setHistoryTree(null)} />}
       {voidTree && (
         <VoidModal tree={voidTree} onClose={() => setVoidTree(null)} onConfirm={(reason) => {

@@ -1,3 +1,4 @@
+import { normalizeScenario } from '@timber/core';
 import type { Block, Scenario, Tree, TreeEvent, TreeStatus, Scale, SpeciesCode } from '@timber/core';
 import type { schema } from '@/db';
 
@@ -27,7 +28,8 @@ export function rowToTree(r: TreeRow): Tree {
     id: r.id, tag: r.tag, tagNumber: r.tagNumber, prefix: r.prefix, blockId: r.blockId,
     lat: r.lat, lon: r.lon, accuracyM: r.accuracyM, fixCount: r.fixCount,
     status: r.status as TreeStatus, voided: r.voided,
-    species: nn(r.species) as SpeciesCode | undefined, dbhCm: nn(r.dbhCm), heightM: nn(r.heightM),
+    species: nn(r.species) as SpeciesCode | undefined, dbhCm: nn(r.dbhCm),
+    circumferenceCm: nn(r.circumferenceCm), photos: nn(r.photos) ?? undefined, heightM: nn(r.heightM),
     heightSource: nn(r.heightSource) as Tree['heightSource'],
     straightness: nn(r.straightness) as Scale | undefined, twist: nn(r.twist) as Scale | undefined,
     branchiness: nn(r.branchiness) as Scale | undefined, defects: nn(r.defects), leaveTree: nn(r.leaveTree),
@@ -41,7 +43,8 @@ export function treeToRow(t: Tree): typeof schema.trees.$inferInsert {
     id: t.id, tag: t.tag, tagNumber: t.tagNumber, prefix: t.prefix, blockId: t.blockId ?? null,
     lat: t.lat, lon: t.lon, accuracyM: t.accuracyM ?? 0, fixCount: t.fixCount ?? 0,
     status: t.status ?? 'standing', voided: !!t.voided,
-    species: t.species ?? null, dbhCm: t.dbhCm ?? null, heightM: t.heightM ?? null, heightSource: t.heightSource ?? null,
+    species: t.species ?? null, dbhCm: t.dbhCm ?? null,
+    circumferenceCm: t.circumferenceCm ?? null, photos: t.photos?.length ? t.photos : null, heightM: t.heightM ?? null, heightSource: t.heightSource ?? null,
     straightness: t.straightness ?? null, twist: t.twist ?? null, branchiness: t.branchiness ?? null,
     defects: t.defects ?? null, leaveTree: t.leaveTree ?? null, notes: t.notes ?? null,
     stumpDiameterCm: t.stumpDiameterCm ?? null, createdBy: t.createdBy, deviceId: t.deviceId,
@@ -54,5 +57,5 @@ export function rowToBlock(r: BlockRow): Block {
 }
 
 export function rowToScenario(r: ScenarioRow): Scenario & { createdBy: string } {
-  return { ...(r.data as unknown as Scenario), id: r.id, name: r.name, updatedAt: r.updatedAt, createdBy: r.createdBy };
+  return { ...normalizeScenario(r.data as Record<string, unknown>), id: r.id, name: r.name, updatedAt: r.updatedAt, createdBy: r.createdBy };
 }

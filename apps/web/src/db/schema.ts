@@ -1,3 +1,5 @@
+import { customType } from 'drizzle-orm/pg-core';
+import type { TreePhoto } from '@timber/core';
 import {
   pgTable, uuid, text, timestamp, integer, bigserial, jsonb, doublePrecision, boolean, index, uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -56,6 +58,7 @@ export const trees = pgTable('trees', {
   voided: boolean('voided').notNull().default(false),
   species: text('species'),
   dbhCm: doublePrecision('dbh_cm'),
+  circumferenceCm: doublePrecision('circumference_cm'),
   heightM: doublePrecision('height_m'),
   heightSource: text('height_source'),
   straightness: integer('straightness'),
@@ -65,6 +68,7 @@ export const trees = pgTable('trees', {
   leaveTree: boolean('leave_tree'),
   notes: text('notes'),
   stumpDiameterCm: doublePrecision('stump_diameter_cm'),
+  photos: jsonb('photos').$type<TreePhoto[]>(),
   createdBy: text('created_by').notNull(),
   deviceId: text('device_id').notNull(),
   createdAt: text('created_at').notNull(),
@@ -89,3 +93,21 @@ export const scenarios = pgTable('scenarios', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: text('updated_at').notNull(),
 });
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
+
+/**
+ * Tree photo bytes, keyed by the photo id recorded in a tree event. Kept in Postgres
+ * for now; swap for Vercel Blob or S3 in production (only this table and the
+ * /api/photos route change).
+ */
+export const photos = pgTable('photos', {
+  id: uuid('id').primaryKey(),
+  treeId: uuid('tree_id'),
+  sha256: text('sha256').notNull(),
+  contentType: text('content_type').notNull().default('image/jpeg'),
+  bytes: integer('bytes').notNull(),
+  data: bytea('data').notNull(),
+  uploadedBy: text('uploaded_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('photos_tree_idx').on(t.treeId)]);

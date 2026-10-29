@@ -11,6 +11,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
+const V2 = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../../screenshots-tmp/v2');
 const SHOTS = process.env.SHOT_DIR ?? path.resolve(here, '../../../screenshots-tmp/web');
 fs.mkdirSync(SHOTS, { recursive: true });
 
@@ -131,6 +132,19 @@ async function desktop(browser) {
   const areaOpt = await page.$eval('[data-testid=area-select]', (s) => s.selectedOptions[0]?.textContent);
   check('save drawn area as block', /Smoke test unit/.test(areaOpt ?? ''), areaOpt);
 
+  // Default scenario has no prices: values read "not set", volumes still show.
+  const noPrice = await totalValue(page);
+  const hint = await page.$('[data-testid=price-hint]');
+  const dash = await page.locator('[data-testid=tree-row] td').filter({ hasText: /^—$/ }).count();
+  check('no prices: totals say "Prices not set", table shows — not $0', /Prices not set/.test(noPrice) && !!hint && dash > 0, `${noPrice}; ${dash} dash cells`);
+  fs.mkdirSync(V2, { recursive: true });
+  await page.screenshot({ path: `${V2}/web-01-no-prices-1440.png` });
+  // Switch to the demo-priced scenario for the value checks below.
+  const demoId = await page.$eval('[data-testid=scenario-select]', (sel) => [...sel.options].find((o) => o.textContent === 'Demo prices (made up)')?.value);
+  await page.selectOption('[data-testid=scenario-select]', demoId);
+  await page.waitForTimeout(400);
+  check('demo $/m³ scenario shows dollars', /^\$/.test(await totalValue(page)), await totalValue(page));
+
   // Inline edit -> update event, value changes, history shows it.
   await page.selectOption('[data-testid=color-by]', 'value');
   const row = page.locator('[data-testid=tree-row]').filter({ has: page.locator('.badge.sawlog') }).first();
@@ -168,7 +182,7 @@ async function desktop(browser) {
 
   // Pricing what-if.
   const tvBefore = await totalValue(page);
-  await page.fill('[data-testid="pole-piece-Class 1"]', '900');
+  await page.fill('[data-testid="pole-m3-Class 1"]', '900');
   await page.fill('[data-testid=saw-FD]', '150');
   await page.waitForTimeout(300);
   const tvAfter = await totalValue(page);

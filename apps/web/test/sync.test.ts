@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 afterAll(async () => { await close(); });
 beforeEach(async () => {
-  await db.execute(dsql`truncate table events, trees, blocks, scenarios, devices, users restart identity cascade`);
+  await db.execute(dsql`truncate table events, trees, blocks, scenarios, devices, photos, users restart identity cascade`);
   userId = (await createUser(db, { email: 'joe@example.com', name: 'Joe', password: 'timber123', tagPrefix: 'J' })).id;
   otherId = (await createUser(db, { email: 'sam@example.com', name: 'Sam', password: 'timber123', tagPrefix: 'S' })).id;
 });

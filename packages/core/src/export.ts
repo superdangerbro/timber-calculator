@@ -8,8 +8,10 @@ const COLUMNS: [string, (t: Tree) => unknown][] = [
   ['prefix', (t) => t.prefix],
   ['species', (t) => t.species],
   ['species_name', (t) => (t.species ? speciesName(t.species) : '')],
+  ['circumference_cm', (t) => t.circumferenceCm],
   ['dbh_cm', (t) => t.dbhCm],
   ['height_m', (t) => t.heightM],
+  ['photo_count', (t) => t.photos?.length ?? 0],
   ['height_source', (t) => t.heightSource],
   ['straightness', (t) => t.straightness],
   ['twist', (t) => t.twist],
@@ -36,7 +38,7 @@ const VALUE_COLUMNS: [string, (v: TreeValuation) => unknown][] = [
   ['product', (v) => v.product],
   ['pole_class', (v) => v.poleClass],
   ['volume_m3', (v) => v.volumeM3],
-  ['value_cad', (v) => v.value],
+  ['value_cad', (v) => (v.priced ? v.value : '')],
 ];
 
 /** RFC 4180 field quoting: quote when the value has a comma, quote, CR or LF (or edge spaces). */
@@ -81,13 +83,14 @@ export function toGeoJson(trees: Tree[], scenario?: Scenario): GeoJSON.FeatureCo
           ...rest,
           speciesName: t.species ? speciesName(t.species) : null,
           color: t.species ? SPECIES_COLORS[t.species] : '#9ca3af',
+          circumference_cm: t.circumferenceCm ?? null,
         };
         if (scenario) {
           const v = valueTree(t, scenario);
           props.product = v.product;
           props.poleClass = v.poleClass;
           props.volumeM3 = v.volumeM3;
-          props.value = v.value;
+          props.value = v.priced ? v.value : null;
         }
         for (const k of Object.keys(props)) if (props[k] === undefined) delete props[k];
         return {

@@ -58,8 +58,10 @@ function makeFields(leave: boolean): TreeFields {
   const height = round1(Math.min(38, Math.max(12, 6 + dbh * 0.48 + between(-4, 4) + (species === 'PL' ? 3 : 0))));
   const good = species === 'PL' || species === 'LW' || species === 'FD' ? 0.7 : 0.4;
   const score = (q: number) => (rand() < q ? pick<1 | 2 | 3 | 4 | 5>([[4, 5], [5, 4], [3, 1]]) : pick<1 | 2 | 3 | 4 | 5>([[1, 1], [2, 3], [3, 4], [4, 2]]));
+  // Taped circumference to the nearest inch, DBH derived from it (C / pi), like Joe measures.
+  const circumferenceCm = round1(Math.round((dbh * Math.PI) / 2.54) * 2.54);
   const f: TreeFields = {
-    species, dbhCm: dbh, heightM: height,
+    species, circumferenceCm, dbhCm: round1(circumferenceCm / Math.PI), heightM: height,
     heightSource: rand() < 0.3 ? 'clinometer' : 'spoken',
     straightness: score(good), twist: score(good + 0.1), branchiness: score(good - 0.05),
   };
@@ -136,7 +138,7 @@ async function main() {
   const { db, sql } = createDb(url);
   try {
     console.log('Resetting tables...');
-    await db.execute(dsql`truncate table events, trees, blocks, scenarios, devices, users restart identity cascade`);
+    await db.execute(dsql`truncate table events, trees, blocks, scenarios, devices, photos, users restart identity cascade`);
 
     const joe = await createUser(db, { email: 'joe@example.com', name: 'Joe Hughes', password: 'timber123', tagPrefix: 'J' });
     const sam = await createUser(db, { email: 'sam@example.com', name: 'Sam Kowalski', password: 'timber123', tagPrefix: 'S' });
@@ -157,15 +159,22 @@ async function main() {
     await appendWebEvent(db, sam.id, joeTrees[3].treeId, 'update', { fields: { dbhCm: 46, notes: 'DBH re-taped in office review' } });
     await appendWebEvent(db, joe.id, joeTrees[8].treeId, 'update', { fields: { straightness: 5 } });
 
-    const base: Scenario = { ...DEFAULT_SCENARIO, id: uuid(), name: 'Placeholder prices', updatedAt: new Date().toISOString() };
+    // The default has no prices (Joe enters his own $/m³). The other two carry made-up demo
+    // numbers so the what-if tools can be tried; they are labelled as such.
+    const base: Scenario = { ...DEFAULT_SCENARIO, id: uuid(), name: 'No prices set', updatedAt: new Date().toISOString() };
+    const demoPrices = {
+      polePricePerM3: { 'Class 1': 260, 'Class 2': 230, 'Class 3': 200, 'Class 4': 170 },
+      sawlogPricePerM3: { FD: 95, LW: 90, PL: 70, SX: 75, CW: 140, PY: 80, BL: 55, HW: 60, AT: 30, EP: 30, AC: 25 },
+    };
     const strict: Scenario = {
-      ...base, id: uuid(), name: 'Strict pole spec',
+      ...base, ...demoPrices, id: uuid(), name: 'Demo prices (made up), strict pole spec',
       poleSpec: { ...base.poleSpec, minStraightness: 5, minTwist: 5, minBranchiness: 4 },
     };
-    const nov: Scenario = {
-      ...base, id: uuid(), name: 'Nov sawlog +10%',
-      sawlogPricePerM3: Object.fromEntries(Object.entries(base.sawlogPricePerM3).map(([k, v]) => [k, Math.round((v ?? 0) * 1.1)])),
-    };
+    const nov: Scenario = { ...base, ...demoPrices, id: uuid(), name: 'Demo prices (made up)' };
+    // The phone follows the most recently updated scenario, so the no-prices one is newest.
+    const older = new Date(Date.now() - 60_000).toISOString();
+    strict.updatedAt = older;
+    nov.updatedAt = older;
     for (const sc of [base, strict, nov]) {
       await db.insert(scenarios).values({ id: sc.id, name: sc.name, data: sc as unknown as Record<string, unknown>, createdBy: joe.id, updatedAt: sc.updatedAt });
     }

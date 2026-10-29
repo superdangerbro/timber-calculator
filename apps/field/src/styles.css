@@ -1849,3 +1849,165 @@ i {
   line-height: 1;
   color: var(--orange);
 }
+
+.edit-derived {
+  margin-top: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent, #ff6b1a);
+}
+
+/* Photos and the tree card */
+.photo-buttons {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.photo-buttons .btn.big {
+  min-height: 64px;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.photo-err {
+  grid-column: 1 / -1;
+  color: var(--bad);
+  font-weight: 700;
+}
+.photo-thumb {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--forest-900);
+  width: 92px;
+  height: 92px;
+  flex: none;
+}
+.photo-thumb.big {
+  width: 100%;
+  height: 210px;
+}
+.photo-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 6px;
+  font-size: 13px;
+  color: var(--dim);
+  text-align: center;
+}
+.card-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.card-sp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 800;
+  margin: 2px 0 6px;
+}
+.card-sp .pill {
+  font-size: 13px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--forest-600);
+}
+.card-sp .pill.void {
+  background: var(--bad);
+  color: #000;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 12px 0 14px;
+  font-size: 18px;
+}
+.card-grid dt {
+  color: var(--muted);
+}
+.card-grid dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.photo-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.viewer-close {
+  position: absolute;
+  top: calc(12px + var(--sat));
+  right: calc(12px + var(--sar));
+}
+.photo-sheet-tag {
+  font-size: 44px;
+  font-weight: 900;
+  color: var(--orange);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.saved-actions {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 10px;
+}
+.saved-actions .btn {
+  min-height: 52px;
+  padding: 0 22px;
+  font-size: 18px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.editor-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.photo-thumb.add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--orange);
+  font-weight: 800;
+  border-style: dashed;
+  border-color: var(--orange);
+  background: transparent;
+}
+.tr-money svg {
+  vertical-align: -2px;
+  margin-left: 4px;
+  color: var(--muted);
+}

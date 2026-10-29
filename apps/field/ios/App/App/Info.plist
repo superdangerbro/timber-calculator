@@ -52,7 +52,11 @@
 	<key>NSMotionUsageDescription</key>
 	<string>The tilt sensor works as a clinometer to measure tree height.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>The camera shows a crosshair to aim at the base and top of a tree when measuring height.</string>
+	<string>The camera takes photos of trees and their flagging tape, and shows a crosshair when measuring height.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach an existing photo of a tree and its flagging tape to the tree record.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Optionally save tree photos to your library.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

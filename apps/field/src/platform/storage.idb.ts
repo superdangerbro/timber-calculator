@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Block, TreeEvent } from '@timber/core';
-import type { LocalStore, StoredEvent, TileRegion } from './types';
+import type { LocalStore, StoredEvent, StoredPhoto, TileRegion } from './types';
 
 interface TimberDB extends DBSchema {
   events: { key: string; value: { id: string; event: TreeEvent; synced: 0 | 1 }; indexes: { synced: number } };
@@ -8,6 +8,7 @@ interface TimberDB extends DBSchema {
   settings: { key: string; value: { key: string; value: unknown } };
   regions: { key: string; value: TileRegion };
   tiles: { key: string; value: { key: string; regionId: string; data: ArrayBuffer }; indexes: { region: string } };
+  photos: { key: string; value: Omit<StoredPhoto, 'synced'> & { synced: 0 | 1 }; indexes: { synced: number } };
 }
 
 /** Web / desktop / test storage: IndexedDB via idb. */
@@ -17,15 +18,21 @@ export class IdbStore implements LocalStore {
 
   async init() {
     if (this.db) return;
-    this.db = await openDB<TimberDB>(this.name, 1, {
-      upgrade(db) {
-        const ev = db.createObjectStore('events', { keyPath: 'id' });
-        ev.createIndex('synced', 'synced');
-        db.createObjectStore('blocks', { keyPath: 'id' });
-        db.createObjectStore('settings', { keyPath: 'key' });
-        db.createObjectStore('regions', { keyPath: 'id' });
-        const tiles = db.createObjectStore('tiles', { keyPath: 'key' });
-        tiles.createIndex('region', 'regionId');
+    this.db = await openDB<TimberDB>(this.name, 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const ev = db.createObjectStore('events', { keyPath: 'id' });
+          ev.createIndex('synced', 'synced');
+          db.createObjectStore('blocks', { keyPath: 'id' });
+          db.createObjectStore('settings', { keyPath: 'key' });
+          db.createObjectStore('regions', { keyPath: 'id' });
+          const tiles = db.createObjectStore('tiles', { keyPath: 'key' });
+          tiles.createIndex('region', 'regionId');
+        }
+        if (oldVersion < 2) {
+          const ph = db.createObjectStore('photos', { keyPath: 'id' });
+          ph.createIndex('synced', 'synced');
+        }
       },
     });
   }
@@ -105,5 +112,21 @@ export class IdbStore implements LocalStore {
   }
   async getTile(key: string) {
     return (await this.db.get('tiles', key))?.data;
+  }
+  async putPhoto(photo: StoredPhoto) {
+    const existing = await this.db.get('photos', photo.id);
+    await this.db.put('photos', { ...photo, synced: photo.synced || existing?.synced ? 1 : 0 });
+  }
+  async getPhoto(id: string) {
+    const r = await this.db.get('photos', id);
+    return r ? { ...r, synced: !!r.synced } : undefined;
+  }
+  async unsyncedPhotos() {
+    const rows = await this.db.getAllFromIndex('photos', 'synced', 0);
+    return rows.map((r) => ({ ...r, synced: false }));
+  }
+  async markPhotoSynced(id: string) {
+    const r = await this.db.get('photos', id);
+    if (r && !r.synced) await this.db.put('photos', { ...r, synced: 1 });
   }
 }

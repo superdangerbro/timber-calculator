@@ -154,6 +154,33 @@ export function SettingsScreen() {
       </section>
 
       <section className="set-section">
+        <h2>Measuring</h2>
+        <Row label="I tape" hint="what a bare number means when you talk">
+          <div className="seg">
+            {(['circumference', 'dbh'] as const).map((m) => (
+              <button key={m} className={st.measure === m ? 'on' : ''} onClick={() => void save({ measure: m })} data-testid={`measure-${m}`}>
+                {m === 'circumference' ? 'Circumference' : 'Diameter'}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row label="Units" hint="for talking and the screen; stored metric">
+          <div className="seg">
+            {(['imperial', 'metric'] as const).map((u) => (
+              <button key={u} className={st.units === u ? 'on' : ''} onClick={() => void save({ units: u })} data-testid={`units-${u}`}>
+                {u === 'imperial' ? 'in / ft' : 'cm / m'}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <p className="hint">
+          {st.measure === 'circumference'
+            ? `Say "circ ${st.units === 'imperial' ? 'seventy five' : 'one ninety'}" or just the number; DBH is worked out (C ÷ π). "DBH 24" still works.`
+            : `Say "${st.units === 'imperial' ? 'twenty four' : 'sixty'}" or "DBH ..."; "circumference ..." also works.`}
+        </p>
+      </section>
+
+      <section className="set-section">
         <h2>Voice</h2>
         <Row label="Read back" hint="speak what was heard + what's missing">
           <Toggle on={st.readback} onChange={(v) => void save({ readback: v })} />

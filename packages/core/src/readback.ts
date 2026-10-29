@@ -1,4 +1,4 @@
-import type { TreeFields } from './types';
+import type { TreeFields, UnitSystem } from './types';
 import { speciesName } from './species';
 import { missingFields } from './parser';
 
@@ -15,16 +15,37 @@ function num(n: number): string {
   return String(Math.round(n * 10) / 10);
 }
 
+export interface ReadbackOptions {
+  /** Units to speak lengths in. Default 'metric'. */
+  units?: UnitSystem;
+}
+
+/** "75 inches" / "190.5 centimetres" for a girth stored in cm. */
+export function speakGirth(cm: number, units: UnitSystem = 'metric'): string {
+  return units === 'imperial' ? `${num(cm / 2.54)} inches` : `${num(cm)} centimetres`;
+}
+
+/** "98 feet" / "30 metres" for a height stored in m (feet rounded to the foot). */
+export function speakHeight(m: number, units: UnitSystem = 'metric'): string {
+  return units === 'imperial' ? `${Math.round(m / 0.3048)} feet` : `${num(m)} metres`;
+}
+
 /**
  * Spoken read-back of a draft, e.g.
  * "Douglas-fir, 42 centimetres, 30 metres, straightness 4, twist 5. Missing: branchiness."
+ * With a circumference: "Douglas-fir, circumference 75 inches, DBH 23.9 inches, 98 feet, ...".
  */
-export function readbackText(draft: TreeFields): string {
+export function readbackText(draft: TreeFields, opts: ReadbackOptions = {}): string {
+  const units = opts.units ?? 'metric';
   const parts: string[] = [];
   if (draft.leaveTree) parts.push('Leave tree');
   if (draft.species) parts.push(speciesName(draft.species));
-  if (draft.dbhCm !== undefined && draft.dbhCm !== null) parts.push(`${num(draft.dbhCm)} centimetres`);
-  if (draft.heightM !== undefined && draft.heightM !== null) parts.push(`${num(draft.heightM)} metres`);
+  const hasCirc = draft.circumferenceCm !== undefined && draft.circumferenceCm !== null;
+  if (hasCirc) parts.push(`circumference ${speakGirth(draft.circumferenceCm as number, units)}`);
+  if (draft.dbhCm !== undefined && draft.dbhCm !== null) {
+    parts.push(hasCirc ? `DBH ${speakGirth(draft.dbhCm, units)}` : speakGirth(draft.dbhCm, units));
+  }
+  if (draft.heightM !== undefined && draft.heightM !== null) parts.push(speakHeight(draft.heightM, units));
   if (draft.straightness !== undefined) parts.push(`straightness ${draft.straightness}`);
   if (draft.twist !== undefined) parts.push(`twist ${draft.twist}`);
   if (draft.branchiness !== undefined) parts.push(`branchiness ${draft.branchiness}`);

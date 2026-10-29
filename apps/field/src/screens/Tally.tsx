@@ -5,10 +5,12 @@ import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
 import { GpsChip, SyncChip } from '../components/chips';
 import { ClashBanner } from '../components/ClashBanner';
-import { FieldEditor, FieldGrid, type FieldKey } from '../components/fields';
+import { FieldEditor, FieldGrid, Modal, type FieldKey } from '../components/fields';
+import { PhotoButtons } from '../components/Photos';
+import { TreeCard } from '../components/TreeCard';
 import { TreeMap } from '../map/TreeMap';
 import { isToday } from '../state/repo';
-import { money, safeSummary, safeValue, sawlogM3 } from '../lib/valuation';
+import { money, safeSummary, safeValue, sawlogM3, scenarioPriced } from '../lib/valuation';
 import { usePressHandler } from '../Shell';
 import type { TallyPhase } from '../state/tally';
 
@@ -56,6 +58,10 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
   const downAt = useRef<number | null>(null);
   const totalsRef = useRef<HTMLDivElement>(null);
   const [padTop, setPadTop] = useState(0);
+  const [cardId, setCardId] = useState<string | null>(null);
+  const units = r.settings.units;
+  const measure = r.settings.measure;
+  const priced = scenarioPriced(repo.scenario);
   const startedByDown = useRef(false);
 
   usePressHandler(() => void tally.press());
@@ -113,7 +119,9 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
     t.phase === 'readback'
       ? 'or say “save”'
       : t.phase === 'listening'
-        ? 'say species, DBH, height…'
+        ? measure === 'circumference'
+          ? 'say species, circumference, height…'
+          : 'say species, DBH, height…'
         : t.phase === 'saved'
           ? 'or just start talking'
           : 'press, click or hold';
@@ -136,6 +144,7 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
           labelIds={t.lastTreeId ? [t.lastTreeId] : []}
           rings={rings}
           padTop={padTop}
+          onSelect={setCardId}
           testId="tally-map"
         />
         <div className="map-chips">
@@ -155,10 +164,17 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
             <b>{sawlogM3(summary).toFixed(1)}</b>
             <span>saw m³</span>
           </div>
-          <div>
-            <b>{money(summary.totalValue)}</b>
-            <span>value</span>
-          </div>
+          {priced ? (
+            <div>
+              <b>{money(summary.totalValue)}</b>
+              <span>value</span>
+            </div>
+          ) : (
+            <div data-testid="totals-volume">
+              <b>{summary.totalVolumeM3.toFixed(1)}</b>
+              <span>total m³</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -198,17 +214,35 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
             </button>
           </div>
         ) : (
-          <TagDisplay tag={t.lastTag} fresh={t.phase === 'saved' && !r.clashes.some((c) => c.tree.id === t.lastTreeId)} />
+          <>
+            <TagDisplay tag={t.lastTag} fresh={t.phase === 'saved' && !r.clashes.some((c) => c.tree.id === t.lastTreeId)} />
+            {t.lastTreeId && t.lastTag && (
+              <div className="saved-actions">
+                <button className="btn ghost" onClick={() => void tally.requestPhoto()} data-testid="saved-photo">
+                  <Icon name="camera" size={24} />
+                  Photo{(repo.tree(t.lastTreeId)?.photos?.length ?? 0) > 0 ? ` (${repo.tree(t.lastTreeId)?.photos?.length})` : ''}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {expanded && (
-          <FieldGrid fields={t.draft} missing={draftEmpty ? [] : t.missing} onEdit={setEditing} />
+          <FieldGrid fields={t.draft} missing={draftEmpty ? [] : t.missing} onEdit={setEditing} units={units} measure={measure} />
         )}
 
         <div className="convo" data-testid="convo">
           <div className="convo-line heard">
             <Icon name="ear" size={18} />
-            <span data-testid="heard">{t.partial || t.heard || <i>Say: “fir forty two, thirty metres, straight four…”</i>}</span>
+            <span data-testid="heard">{t.partial || t.heard || <i>
+                  {measure === 'circumference'
+                    ? units === 'imperial'
+                      ? 'Say: “fir, circ seventy five, ninety eight feet, straight four…”'
+                      : 'Say: “fir, circ one ninety, thirty metres, straight four…”'
+                    : units === 'imperial'
+                      ? 'Say: “fir, twenty four inches, ninety eight feet, straight four…”'
+                      : 'Say: “fir forty two, thirty metres, straight four…”'}
+                </i>}</span>
           </div>
           <div className={`convo-line spoken${t.speaking ? ' live' : ''}`}>
             <Icon name="speaker" size={18} />
@@ -267,8 +301,19 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
           value={t.draft}
           onChange={(patch: TreeFields) => tally.setField(patch)}
           onClose={() => setEditing(null)}
+          units={units}
         />
       )}
+
+      {t.photoRequest && repo.tree(t.photoRequest.treeId) && (
+        <Modal title="Photo" onClose={() => void tally.photoDone(false)} testId="photo-sheet">
+          <div className="photo-sheet-tag">{t.photoRequest.tag}</div>
+          <p className="hint center">Get the tree and its flagging tape in the shot.</p>
+          <PhotoButtons tree={repo.tree(t.photoRequest.treeId)!} autoCamera onSaved={(ok) => void tally.photoDone(ok)} />
+        </Modal>
+      )}
+
+      {cardId && repo.tree(cardId) && <TreeCard tree={repo.tree(cardId)!} onClose={() => setCardId(null)} />}
     </div>
   );
 }

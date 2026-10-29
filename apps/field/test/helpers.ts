@@ -12,10 +12,15 @@ export function dbName() {
   return `test-${Date.now()}-${n++}`;
 }
 
-export async function makeRig(opts: { name?: string; interpreter?: Interpreter } = {}) {
+/**
+ * Test rig. Defaults to metric + diameter so the older tests read naturally;
+ * pass `imperial: true` for Joe's setup (circumference in inches, heights in feet).
+ */
+export async function makeRig(opts: { name?: string; interpreter?: Interpreter; imperial?: boolean } = {}) {
   const name = opts.name ?? dbName();
   const store = new IdbStore(name);
   const repo = await Repo.open(store);
+  await repo.saveSettings(opts.imperial ? { units: 'imperial', measure: 'circumference' } : { units: 'metric', measure: 'dbh' });
   const gps = new GpsTracker();
   const speech = new TextSpeech();
   const tts = new SilentTts();

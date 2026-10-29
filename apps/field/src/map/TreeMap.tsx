@@ -195,6 +195,7 @@ export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelec
       setZoom(map.getZoom());
     });
     map.on('dragstart', () => (following.current = false));
+    if (testId) ((window as unknown as { __fieldMaps?: Record<string, maplibregl.Map> }).__fieldMaps ??= {})[testId] = map; // e2e hook
     map.on('click', 'trees', (e) => {
       const id = e.features?.[0]?.properties?.id;
       if (id) onSelectRef.current?.(String(id));
@@ -249,6 +250,7 @@ export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelec
         type: 'Feature',
         properties: {
           id: t.id,
+          tag: t.tag,
           color: (t.species && (SPECIES_COLORS as Record<string, string>)?.[t.species]) || FALLBACK_COLOR,
           ring: t.leaveTree ? '#ffffff' : rings?.[t.id] ?? '#0c1d14',
           leave: !!t.leaveTree,

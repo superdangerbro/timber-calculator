@@ -48,7 +48,13 @@ export interface AveragedPosition {
 /** Everything that can be measured or said about a tree. All optional while drafting. */
 export interface TreeFields {
   species?: SpeciesCode;
+  /** Diameter at breast height, cm. Derived from circumference (C / pi) when that was measured. */
   dbhCm?: number;
+  /**
+   * Circumference at breast height, cm, when that is what was measured. null means
+   * "cleared" (DBH was given directly afterwards).
+   */
+  circumferenceCm?: number | null;
   /** Marketable (merchantable) height, metres. */
   heightM?: number;
   /** How the height was obtained. */
@@ -61,6 +67,22 @@ export interface TreeFields {
   notes?: string;
 }
 
+/** A photo attached to a tree. The image bytes sync separately, keyed by id. */
+export interface TreePhoto {
+  id: string; // uuid v4
+  takenAt: string; // ISO
+  lat?: number | null;
+  lon?: number | null;
+  width: number;
+  height: number;
+  bytes: number;
+  /** sha-256 hex of the JPEG bytes, so the event log vouches for the image. */
+  sha256: string;
+}
+
+/** Display/readback units. Storage is always metric. */
+export type UnitSystem = 'metric' | 'imperial';
+
 export type TreeEventType = 'create' | 'update' | 'void' | 'status';
 
 export interface TreeEvent {
@@ -71,7 +93,7 @@ export interface TreeEvent {
   type: TreeEventType;
   /**
    * create: { tag, tagNumber, prefix, blockId?, position, fields }
-   * update: { fields } (partial; only changed fields)
+   * update: { fields } (partial; only changed fields) and/or { photos: TreePhoto[] } (appended)
    * void:   { reason? }
    * status: { status, stumpDiameterCm? }
    */
@@ -103,6 +125,8 @@ export interface Tree extends TreeFields {
   deviceId: string;
   createdAt: string;
   updatedAt: string;
+  /** Photos in the order they were added; the first is the thumbnail. */
+  photos?: TreePhoto[];
   /** Number of events folded into this tree. */
   version: number;
 }
@@ -137,9 +161,9 @@ export interface PoleClassRule {
 export interface Scenario {
   id: string;
   name: string; // "Nov prices", "strict pole spec"
-  /** $ per pole by class name and length bucket: price = perPiece[class] + perMetre[class] * length. */
-  polePrices: Record<string, { perPiece: number; perMetre: number }>;
-  /** $ per m³ for sawlog by species. */
+  /** $ per m³ (gross volume) for poles, by pole class name. Empty until prices are entered. */
+  polePricePerM3: Record<string, number>;
+  /** $ per m³ (net volume) for sawlog by species. Empty until prices are entered. */
   sawlogPricePerM3: Partial<Record<SpeciesCode, number>>;
   poleSpec: PoleSpec;
   /** BC BEC zone for the Kozak taper volume equations (e.g. "ICH", "IDF", "SBS"). Default ICH. */
@@ -169,6 +193,8 @@ export interface TreeValuation {
   poleClass: string | null;
   volumeM3: number;
   value: number; // dollars
+  /** False when the $/m³ for this tree's product is not set; value is then 0. */
+  priced: boolean;
 }
 
 export interface AreaSummary {
@@ -181,6 +207,13 @@ export interface AreaSummary {
   sawlogValue: number;
   totalValue: number;
   leaveTreeCount: number;
+  sawlogCount: number;
+  /** Gross volume of pole trees, m³. */
+  poleM3: number;
+  /** Net sawlog volume, m³. */
+  sawlogM3: number;
+  /** Pole or sawlog trees whose $/m³ is not set (their value counts as 0). */
+  unpricedCount: number;
 }
 
 /** Result of parsing one spoken utterance. */
@@ -195,7 +228,7 @@ export interface ParseResult {
   confidence: number;
 }
 
-export type VoiceCommand = 'save' | 'repeat' | 'undo' | 'measure_height' | 'cancel' | 'new_tree';
+export type VoiceCommand = 'save' | 'repeat' | 'undo' | 'measure_height' | 'cancel' | 'new_tree' | 'photo';
 
 /** Sync wire format. */
 export interface SyncPushRequest {

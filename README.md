@@ -1,11 +1,12 @@
 # Timber Calculator
 
 Offline-first, voice-driven tree tally for Interior BC timber cruising. Walk up to a tree,
-talk ("big fir forty two, about thirty metres, straight four, no twist, clean"), the phone
-fills the form, reads it back, and on "save" speaks a tag number (J-0147) for the flagging
-tape. Every tree gets a GPS position, a pole-or-sawlog call and a dollar value. The office
-dashboard puts it all on a map with filters, an editable table, and live value totals for
-any area you draw, under prices you can change.
+talk ("fir circumference seventy five inches, ninety eight feet, straight four, no twist, clean"),
+the phone fills the form, works out DBH from the circumference, reads it back, and on "save"
+speaks a tag number (J-0147) for the flagging tape. Say "take a photo" (or tap Photo) to attach
+a picture. Every tree gets a GPS position, a volume and a pole-or-sawlog call. The office
+dashboard puts it all on a map with filters, an editable table, and live totals for any area
+you draw, plus dollar values once you enter your own $/m³.
 
 | Part | Path | Stack |
 | --- | --- | --- |
@@ -57,6 +58,19 @@ working offline do not hand out the same numbers. If a clash does happen (for ex
 tallying before the first sign-in), the phone flags it and offers a one-tap re-tag, and
 the dashboard marks the duplicate.
 
-Prices, pole specs and volume coefficients are **placeholders** until confirmed. All of
-them are editable as pricing scenarios in the dashboard, and pricing never changes field
-measurements.
+**Measuring.** The field app defaults to circumference in imperial units (Settings >
+Measuring switches to DBH and/or metric). Units only change what is shown and read back:
+everything is stored metric (`circumference_cm`, `dbh_cm` = C / pi, `height_m`), and DBH can
+still be spoken directly.
+
+**Pricing.** There are no built-in prices. The default scenario is "No prices set", so the
+dashboard and phone show m³ and pole/sawlog counts until you enter a pole $/m³ per class
+(on gross volume) and a sawlog $/m³ per species (on net volume) in What-if pricing. The seed
+adds two scenarios marked "Demo prices (made up)" for trying the what-if tools. Pole specs and
+volume settings are editable there too, and pricing never changes field measurements.
+
+**Photos.** Photos are shrunk on the phone to about 1280 px JPEG (under 250 KB), kept offline,
+and uploaded on sync to `PUT /api/photos/:id` (sha-256 checked, idempotent). The tree's event
+log records each photo's id and hash. The server keeps the bytes in a Postgres `bytea` table,
+which is fine for a few thousand photos; for production volume swap `apps/web/src/lib/server/photos.ts`
+to Vercel Blob or S3 and keep the same API.

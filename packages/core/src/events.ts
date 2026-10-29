@@ -1,4 +1,4 @@
-import type { AveragedPosition, Tree, TreeEvent, TreeEventType, TreeFields, TreeStatus } from './types';
+import type { AveragedPosition, Tree, TreeEvent, TreeEventType, TreeFields, TreePhoto, TreeStatus } from './types';
 import { uuid } from './uuid';
 
 /**
@@ -123,7 +123,7 @@ export async function verifyChain(events: TreeEvent[]): Promise<{ ok: boolean; b
 }
 
 const FIELD_KEYS: (keyof TreeFields)[] = [
-  'species', 'dbhCm', 'heightM', 'heightSource', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree', 'notes',
+  'species', 'dbhCm', 'circumferenceCm', 'heightM', 'heightSource', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree', 'notes',
 ];
 
 function applyFields(tree: Tree, fields: unknown) {
@@ -147,12 +147,25 @@ function applyPosition(tree: Tree, pos: unknown) {
   if (typeof p.fixCount === 'number') tree.fixCount = p.fixCount;
 }
 
+/** Photos are append-only: new ids are added in order, known ids are ignored. */
+function applyPhotos(tree: Tree, photos: unknown) {
+  if (!Array.isArray(photos)) return;
+  const list = tree.photos ? [...tree.photos] : [];
+  for (const ph of photos) {
+    if (!ph || typeof ph !== 'object' || typeof (ph as TreePhoto).id !== 'string') continue;
+    if (list.some((x) => x.id === (ph as TreePhoto).id)) continue;
+    list.push(ph as TreePhoto);
+  }
+  if (list.length) tree.photos = list;
+}
+
 /**
  * Fold the events of one tree into its current state. Events are de-duplicated
  * by id and applied in seq order (createdAt breaks ties). Returns null when
  * there is no create event.
  *
  * - create: { tag, tagNumber, prefix, blockId?, position, fields }
+ * - create/update: optional { photos: TreePhoto[] } appends photos.
  * - update: { fields } – keys present replace the current value (null clears);
  *   defects are replaced, not appended. Optional { position } moves the tree,
  *   optional { tag, tagNumber, prefix, blockId } re-tags it.
@@ -189,6 +202,7 @@ export function foldEvents(events: TreeEvent[]): Tree | null {
   };
   applyPosition(tree, p.position);
   applyFields(tree, p.fields);
+  applyPhotos(tree, p.photos);
 
   let version = 1;
   for (let i = 0; i < evs.length; i++) {
@@ -205,6 +219,7 @@ export function foldEvents(events: TreeEvent[]): Tree | null {
         if (typeof pl.tagNumber === 'number') tree.tagNumber = pl.tagNumber;
         if (typeof pl.prefix === 'string') tree.prefix = pl.prefix;
         if ('blockId' in pl) tree.blockId = (pl.blockId as string | null) ?? null;
+        applyPhotos(tree, pl.photos);
         break;
       case 'void':
         tree.voided = pl.voided === false ? false : true;

@@ -32,6 +32,8 @@ export interface TallyState {
   notice: string | null;
   /** True while TTS is talking. */
   speaking: boolean;
+  /** Set when a photo should be taken for a tree; the screen opens the camera. */
+  photoRequest: PhotoRequest | null;
 }
 
 export interface TallyDeps {
@@ -42,6 +44,12 @@ export interface TallyDeps {
   interpreter: Interpreter;
   /** "measure height" voice command. */
   onMeasureHeight?: () => void;
+}
+
+/** A tree waiting for its photo (the "photo" command or the Photo button). */
+export interface PhotoRequest {
+  treeId: string;
+  tag: string;
 }
 
 const COMMAND_WORDS = [
@@ -78,6 +86,12 @@ const COMMAND_WORDS = [
   'catface',
   'metres',
   'centimetres',
+  'circumference',
+  'circ',
+  'inches',
+  'feet',
+  'take a photo',
+  'photo',
 ];
 
 export function contextualStrings(): string[] {
@@ -90,7 +104,7 @@ export function contextualStrings(): string[] {
 }
 
 function isEmpty(f: TreeFields) {
-  return Object.values(f).every((v) => v === undefined || v === '' || v === false);
+  return Object.values(f).every((v) => v === undefined || v === null || v === '' || v === false);
 }
 
 /**
@@ -119,6 +133,7 @@ export class TallyController extends Emitter<TallyState> {
       lastTreeId: last?.id ?? null,
       notice: null,
       speaking: false,
+      photoRequest: null,
     });
   }
 
@@ -203,7 +218,8 @@ export class TallyController extends Emitter<TallyState> {
     this.setState({ heard, partial: '', notice: null });
     let result: ParseResult;
     try {
-      result = parseUtterance(heard);
+      const st = this.deps.repo.settings;
+      result = parseUtterance(heard, { units: st.units, measure: st.measure });
     } catch (err) {
       this.setState({ notice: `parser: ${(err as Error).message}` });
       return;
@@ -245,6 +261,8 @@ export class TallyController extends Emitter<TallyState> {
         this.setDraft({});
         this.setState({ phase: 'listening' });
         return this.sayThenListen('Cancelled.');
+      case 'photo':
+        return this.requestPhoto();
       case 'new_tree':
         this.deps.gps.beginTree();
         this.setDraft({});
@@ -261,7 +279,7 @@ export class TallyController extends Emitter<TallyState> {
     }
     let text: string;
     try {
-      text = readbackText(this.state.draft);
+      text = readbackText(this.state.draft, { units: this.deps.repo.settings.units });
     } catch {
       text = 'Got it.';
     }
@@ -271,7 +289,11 @@ export class TallyController extends Emitter<TallyState> {
   async save() {
     const draft = this.state.draft;
     if (isEmpty(draft) || (!draft.species && draft.dbhCm === undefined)) {
-      return this.sayThenListen('Nothing to save yet. Say species and diameter.');
+      return this.sayThenListen(
+        this.deps.repo.settings.measure === 'circumference'
+          ? 'Nothing to save yet. Say species and circumference.'
+          : 'Nothing to save yet. Say species and diameter.',
+      );
     }
     this.turn++;
     const position = this.deps.gps.endTree();
@@ -294,6 +316,30 @@ export class TallyController extends Emitter<TallyState> {
       notice: `Re-tagged ${old} as ${tree.tag}: put new tape on it`,
     });
     return this.sayThenListen(`Re-tag. ${tagSpeech(tree.tag)}`);
+  }
+
+  /**
+   * Ask for a photo of the current tree: the last saved one, or the tree being
+   * drafted once it is saved. The screen opens the camera when it sees the request.
+   */
+  async requestPhoto(treeId?: string) {
+    const id = treeId ?? this.state.lastTreeId;
+    const tree = id ? this.deps.repo.tree(id) : undefined;
+    if (!tree) return this.sayThenListen('Save the tree first, then say photo.');
+    this.turn++;
+    if (this.deps.speech.kind !== 'text') await this.deps.speech.stop();
+    this.setState({ photoRequest: { treeId: tree.id, tag: tree.tag }, notice: `Photo for ${tree.tag}` });
+  }
+
+  /** The camera closed: photo saved (or cancelled). */
+  async photoDone(saved: boolean) {
+    const req = this.state.photoRequest;
+    this.setState({ photoRequest: null, notice: req ? (saved ? `Photo added to ${req.tag}` : 'No photo taken') : null });
+    if (req && saved) await this.say('Photo saved.');
+    if (this.state.phase !== 'idle') {
+      this.turn++;
+      void this.listen();
+    }
   }
 
   async repeat() {

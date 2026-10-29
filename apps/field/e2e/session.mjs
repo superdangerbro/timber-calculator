@@ -6,7 +6,7 @@
 //   pnpm --filter @timber/field dev        # in one terminal
 //   node apps/field/e2e/session.mjs        # in another (BASE_URL to override)
 import { createRequire } from 'node:module';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,6 +79,12 @@ try {
   // ---------------------------------------------------------------- boot
   await page.goto(`${BASE}?speech=text&tts=silent&notch=1`);
   await tid('talk').waitFor();
+  // The first part of the session talks metric diameters; Joe's imperial
+  // circumference setup is exercised at the end.
+  await tid('tab-settings').click();
+  await tid('units-metric').click();
+  await tid('measure-dbh').click();
+  await tid('tab-tally').click();
   await page.waitForTimeout(1500);
   log('Tally home, empty');
   await shot('01-tally-empty');
@@ -342,6 +348,128 @@ try {
   await shot('28-simulated-gps');
   await tid('tab-settings').click();
   await tid('sim-gps').click();
+
+  // ---------------------------------------------------------------- v2: circumference in imperial, photo, info card
+  const V2 = join(here, '../../../screenshots-tmp/v2');
+  mkdirSync(V2, { recursive: true });
+  const shot2 = async (name) => {
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: join(V2, `${name}.png`) });
+    console.log('    screenshot v2', name);
+  };
+  await tid('tab-settings').click();
+  await tid('units-imperial').click();
+  await tid('measure-circumference').click();
+  await tid('tab-tally').click();
+  await page.waitForTimeout(600);
+  await moveTo(60, -40);
+  await tid('talk').click();
+  await say('fir circumference seventy five inches ninety eight feet straight four no twist clean');
+  await waitPhase('readback');
+  const rb = (await tid('spoken').textContent()).trim();
+  assert(rb === 'Douglas-fir, circumference 75 inches, DBH 23.9 inches, 98 feet, straightness 4, twist 5, branchiness 5.', `imperial readback: ${rb}`);
+  log('Imperial readback:', rb);
+  await shot2('field-01-readback-circumference');
+  await say('save');
+  await waitPhase('saved');
+  const circTag = await lastTag();
+  assert(circTag === 'J-0008', `circumference tree tag ${circTag}`);
+  // Stored metric: 75 in = 190.5 cm circumference, DBH = C / pi = 60.6 cm, 98 ft = 29.9 m.
+  const stored = await page.evaluate(() => new Promise((res, rej) => {
+    const r = indexedDB.open('timber-field');
+    r.onerror = () => rej(r.error);
+    r.onsuccess = () => {
+      const q = r.result.transaction('events').objectStore('events').getAll();
+      q.onsuccess = () => res(q.result.map((row) => row.event).find((e) => e.type === 'create' && e.payload.tag === 'J-0008')?.payload.fields);
+    };
+  }));
+  assert(stored && stored.circumferenceCm === 190.5 && Math.abs(stored.dbhCm - 60.6) < 0.05 && Math.abs(stored.heightM - 29.9) < 0.05,
+    'stored metric fields: ' + JSON.stringify(stored));
+  log('Stored:', JSON.stringify({ circumferenceCm: stored.circumferenceCm, dbhCm: stored.dbhCm, heightM: stored.heightM }));
+  await shot2('field-02-saved-with-photo-button');
+
+  // Photo: a big test JPEG (exercises the on-device shrink to <= 1280 px).
+  const jpegPath = join(V2, 'test-photo.jpg');
+  const jpegB64 = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 2400; c.height = 1800;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 1800);
+    grad.addColorStop(0, '#9cc7e8'); grad.addColorStop(1, '#2f5d3a');
+    g.fillStyle = grad; g.fillRect(0, 0, 2400, 1800);
+    g.fillStyle = '#5b3b22'; g.fillRect(1050, 300, 300, 1500);
+    g.fillStyle = '#ff6b1a'; g.fillRect(1030, 1000, 340, 70);
+    g.fillStyle = '#fff'; g.font = 'bold 54px sans-serif'; g.fillText('J-0008', 1110, 1052);
+    for (let i = 0; i < 4000; i++) { g.fillStyle = `hsl(${100 + (i % 40)},40%,${15 + (i % 30)}%)`; g.fillRect((i * 97) % 2400, (i * 53) % 900, 6, 6); }
+    return c.toDataURL('image/jpeg', 0.95).split(',')[1];
+  });
+  writeFileSync(jpegPath, Buffer.from(jpegB64, 'base64'));
+  await tid('saved-photo').click();
+  await tid('photo-sheet').waitFor();
+  await shot2('field-03-photo-sheet');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), tid('photo-library').click()]);
+  await chooser.setFiles(jpegPath);
+  await tid('photo-sheet').waitFor({ state: 'detached', timeout: 15000 });
+  await page.waitForFunction(() => /Photo added/.test(document.querySelector('[data-testid=notice]')?.textContent ?? ''), null, { timeout: 8000 });
+  log('Photo attached to', circTag);
+
+  // Tap the tree's dot -> info card with the thumbnail.
+  const pt = await page.evaluate((tag) => {
+    const m = window.__fieldMaps['tally-map'];
+    const f = m.querySourceFeatures('trees').find((x) => x.properties.tag === tag);
+    if (!f) return null;
+    m.jumpTo({ center: f.geometry.coordinates });
+    const p = m.project(f.geometry.coordinates);
+    const r = m.getCanvas().getBoundingClientRect();
+    return { x: r.left + p.x, y: r.top + p.y };
+  }, circTag);
+  assert(pt, 'tree dot on map');
+  await page.waitForTimeout(400);
+  await page.mouse.click(pt.x, pt.y);
+  await tid('tree-card').waitFor({ timeout: 5000 });
+  await page.waitForFunction(() => {
+    const img = document.querySelector('[data-testid=tree-card] [data-testid=photo-img]');
+    return img && img.complete && img.naturalWidth > 0;
+  }, null, { timeout: 8000 });
+  const dims = await page.evaluate(() => {
+    const img = document.querySelector('[data-testid=tree-card] [data-testid=photo-img]');
+    return { w: img.naturalWidth, h: img.naturalHeight };
+  });
+  assert(Math.max(dims.w, dims.h) <= 1280, `photo shrunk to <= 1280 px, got ${dims.w}x${dims.h}`);
+  const cardText = (await tid('tree-card').textContent()).replace(/\s+/g, ' ');
+  assert(/75 in/.test(cardText) && /23\.9 in/.test(cardText) && /98 ft/.test(cardText) && /prices not set/.test(cardText), `card: ${cardText}`);
+  log(`Info card OK, photo ${dims.w}x${dims.h}`);
+  await shot2('field-04-info-card-photo');
+  await tid('photo-thumb').first().click();
+  await tid('photo-viewer').waitFor();
+  await shot2('field-05-photo-fullscreen');
+  await tid('photo-viewer').click();
+  await page.locator('[data-testid=tree-card] .icon-btn[aria-label=Close]').click();
+
+  // Totals without prices show volume, not dollars.
+  assert(await tid('totals-volume').count(), 'totals show m³ when no prices');
+  await shot2('field-06-totals-no-prices');
+
+  // Tree editor: circumference field and derived DBH; stored metric.
+  await tid('tab-trees').click();
+  await tid('when-all').click();
+  await tid(`row-${circTag}`).click();
+  await tid('tree-editor').waitFor();
+  await tid('field-circumferenceCm').click();
+  await tid('input-circumferenceCm').fill('78');
+  assert(/DBH 24\.8 in/.test(await tid('derived-dbh').textContent()), 'derived DBH shown while typing');
+  await shot2('field-07-editor-circumference');
+  await page.locator('[data-testid=editor-circumferenceCm] button[type=submit]').click();
+  await tid('save-edit').click();
+  await tid('tab-settings').click();
+  await tid('units-metric').click();
+  await tid('tab-trees').click();
+  const rowText = (await tid(`row-${circTag}`).textContent()).replace(/\s+/g, ' ');
+  assert(/C 198\.1 cm/.test(rowText) && /63\.1 cm/.test(rowText), `stored metric after edit: ${rowText}`);
+  log('Edited circumference, metric row:', rowText);
+  await shot2('field-08-trees-metric');
+  await tid('tab-settings').click();
+  await tid('units-imperial').click();
 
   const relevant = errors.filter((e) => !/net::ERR_INTERNET_DISCONNECTED|Failed to load resource/.test(e));
   if (relevant.length) {

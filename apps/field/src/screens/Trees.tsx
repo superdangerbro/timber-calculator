@@ -6,11 +6,13 @@ import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
 import { FieldEditor, FieldGrid, Modal, SpeciesDot, speciesLabel, type FieldKey } from '../components/fields';
 import { isToday } from '../state/repo';
-import { money, safeSummary, safeValue, sawlogM3 } from '../lib/valuation';
+import { money, safeSummary, safeValue, sawlogM3, scenarioPriced } from '../lib/valuation';
+import { girthText, heightText } from '../lib/units';
+import { PhotoButtons, PhotoThumb, PhotoViewer } from '../components/Photos';
 
 type Product = 'all' | 'pole' | 'sawlog' | 'none';
 
-const FIELD_KEYS: (keyof TreeFields)[] = ['species', 'dbhCm', 'heightM', 'heightSource', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree', 'notes'];
+const FIELD_KEYS: (keyof TreeFields)[] = ['species', 'circumferenceCm', 'dbhCm', 'heightM', 'heightSource', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree', 'notes'];
 
 function TreeEditor({ tree, onClose }: { tree: Tree; onClose: () => void }) {
   const { repo } = useApp();
@@ -21,6 +23,11 @@ function TreeEditor({ tree, onClose }: { tree: Tree; onClose: () => void }) {
   });
   const [editing, setEditing] = useState<FieldKey | null>(null);
   const [confirmVoid, setConfirmVoid] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const r = useEmitter(repo);
+  const live = r.trees.find((t) => t.id === tree.id) ?? tree;
+  const units = r.settings.units;
 
   const changed = useMemo(() => {
     const out: TreeFields = {};
@@ -44,7 +51,22 @@ function TreeEditor({ tree, onClose }: { tree: Tree; onClose: () => void }) {
         fields={draft}
         onEdit={setEditing}
         compact
+        units={units}
+        measure={r.settings.measure}
       />
+      <div className="editor-photos" data-testid="editor-photos">
+        {(live.photos ?? []).map((p) => (
+          <PhotoThumb key={p.id} photoId={p.id} onOpen={() => setViewing(p.id)} />
+        ))}
+        {!tree.voided && !adding && (
+          <button className="photo-thumb add" onClick={() => setAdding(true)} data-testid="editor-add-photo" aria-label="Add photo">
+            <Icon name="camera" size={30} />
+            <span>Photo</span>
+          </button>
+        )}
+      </div>
+      {adding && <PhotoButtons tree={live} onSaved={(ok) => ok && setAdding(false)} />}
+      {viewing && <PhotoViewer photoId={viewing} onClose={() => setViewing(null)} />}
       <div className="edit-actions spaced">
         {tree.voided ? (
           <div className="voided-note">Voided — number {tree.tag} is retired</div>
@@ -88,6 +110,7 @@ function TreeEditor({ tree, onClose }: { tree: Tree; onClose: () => void }) {
             return n;
           })}
           onClose={() => setEditing(null)}
+          units={units}
         />
       )}
     </Modal>
@@ -103,6 +126,8 @@ export function TreesScreen() {
   const [showVoid, setShowVoid] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const scenario = repo.scenario;
+  const priced = scenarioPriced(scenario);
+  const units = r.settings.units;
 
   const rows = useMemo(() => {
     return r.trees
@@ -164,9 +189,7 @@ export function TreesScreen() {
         <span>
           <b>{sawlogM3(summary).toFixed(1)}</b> m³
         </span>
-        <span>
-          <b>{money(summary.totalValue)}</b>
-        </span>
+        <span>{priced ? <b>{money(summary.totalValue)}</b> : <><b>{summary.totalVolumeM3.toFixed(1)}</b> m³ total</>}</span>
         <label className="void-toggle">
           <input type="checkbox" checked={showVoid} onChange={(e) => setShowVoid(e.target.checked)} /> voids
         </label>
@@ -186,13 +209,17 @@ export function TreesScreen() {
                   {t.status !== 'standing' && <span className={`badge st-${t.status}`}>{t.status}</span>}
                 </div>
                 <div className="tr-dims">
-                  {t.dbhCm ?? '—'} cm · {t.heightM ?? '—'} m · S{t.straightness ?? '-'} T{t.twist ?? '-'} B{t.branchiness ?? '-'}
+                  {t.circumferenceCm ? `C ${girthText(t.circumferenceCm, units)} · ` : ''}
+                  {girthText(t.dbhCm, units)} · {heightText(t.heightM, units)} · S{t.straightness ?? '-'} T{t.twist ?? '-'} B{t.branchiness ?? '-'}
                   {t.defects ? ` · ${t.defects}` : ''}
                 </div>
               </div>
               <div className="tr-value">
                 <div className={`prod ${v.product}`}>{v.product === 'pole' ? v.poleClass ?? 'Pole' : v.product === 'none' ? '—' : 'Sawlog'}</div>
-                <div className="tr-money">{t.voided ? 'void' : money(v.value)}</div>
+                <div className="tr-money">
+                  {t.voided ? 'void' : v.product === 'none' ? '—' : v.priced ? money(v.value) : `${v.volumeM3.toFixed(2)} m³`}
+                  {t.photos?.length ? <Icon name="camera" size={16} /> : null}
+                </div>
               </div>
             </button>
           </li>

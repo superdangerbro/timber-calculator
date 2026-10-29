@@ -38,6 +38,7 @@ export const scaleSchema = z.number().int().min(1).max(5);
 export const fieldsSchema = z.object({
   species: z.enum(['FD', 'CW', 'LW', 'PL', 'PY', 'SX', 'BL', 'HW', 'AT', 'EP', 'AC']).optional(),
   dbhCm: z.number().min(1).max(400).optional(),
+  circumferenceCm: z.number().min(3).max(1300).nullable().optional(),
   heightM: z.number().min(0.5).max(90).optional(),
   heightSource: z.enum(['spoken', 'clinometer', 'estimated']).optional(),
   straightness: scaleSchema.optional(),

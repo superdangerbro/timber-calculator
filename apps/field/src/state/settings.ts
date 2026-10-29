@@ -1,4 +1,4 @@
-import type { Scenario, UserProfile } from '@timber/core';
+import type { Scenario, UnitSystem, UserProfile } from '@timber/core';
 
 export interface Settings {
   deviceId: string;
@@ -15,6 +15,10 @@ export interface Settings {
   activeBlockId: string | null;
   readback: boolean;
   ttsRate: number;
+  /** Units for readback and display (storage is always metric). */
+  units: UnitSystem;
+  /** What a bare girth number means: circumference at breast height (taped) or DBH. */
+  measure: 'circumference' | 'dbh';
   simulatedGps: boolean;
   autoSync: boolean;
   /** Latest scenario pulled from the server (pricing for running totals). */
@@ -36,6 +40,8 @@ export function defaultSettings(deviceId: string): Settings {
     activeBlockId: null,
     readback: true,
     ttsRate: 1,
+    units: 'imperial',
+    measure: 'circumference',
     simulatedGps: false,
     autoSync: true,
     scenario: null,
