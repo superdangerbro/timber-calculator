@@ -7,6 +7,19 @@ export { readbackText, tagSpeech } from './readback';
 export { formatTag, nextTagNumber } from './tags';
 export { evaluatePole } from './pole';
 export { treeVolumeM3, DEFAULT_VOLUME_COEFFICIENTS } from './volume';
+export type { VolumeCoefficients, VolumeOptions } from './volume';
+export {
+  BEC_ZONES,
+  DEFAULT_BEC_ZONE,
+  DEFAULT_TOP_DIB_CM,
+  KOZAK_SPECIES_FOR,
+  kozakCoefficients,
+  kozakTreeVolume,
+  dibCm,
+  stemVolumeM3,
+  totalHeightFromMerch,
+} from './taper';
+export type { BecZone, KozakTreeVolume } from './taper';
 export { valueTree, summarize, DEFAULT_SCENARIO } from './value';
 export { averageFixes } from './gps';
 export { heightFromAngles } from './clinometer';

@@ -1,44 +1,48 @@
 import type { SpeciesCode } from './types';
+import { kozakTreeVolume } from './taper';
 
 export type VolumeCoefficients = { a: number; b: number; c: number };
 
 /**
- * PLACEHOLDER Schumacher-Hall coefficients, V(m³) = a · DBH(cm)^b · H(m)^c.
- *
- * These are NOT the BC Ministry taper/volume equations. They were tuned so that a
- * 40 cm, 30 m Douglas-fir comes out around 1.75 m³ (other species scaled by a
- * rough form factor). Replace with the confirmed BC equations (or per-scenario
- * `volumeCoefficients`) before using numbers for anything that matters.
+ * Optional Schumacher-Hall overrides, V(m³) = a · DBH(cm)^b · H(m)^c, for a
+ * scenario that wants its own local equation for a species. Empty by default:
+ * every species uses the Ministry's Kozak taper equations (see taper.ts).
  */
-export const DEFAULT_VOLUME_COEFFICIENTS: Record<SpeciesCode, VolumeCoefficients> = {
-  FD: { a: 5.2421e-5, b: 1.92, c: 0.98 },
-  LW: { a: 5.1522e-5, b: 1.92, c: 0.98 },
-  PL: { a: 5.0324e-5, b: 1.92, c: 0.98 },
-  PY: { a: 4.8527e-5, b: 1.92, c: 0.98 },
-  SX: { a: 5.0923e-5, b: 1.92, c: 0.98 },
-  BL: { a: 4.7928e-5, b: 1.92, c: 0.98 },
-  HW: { a: 5.0324e-5, b: 1.92, c: 0.98 },
-  CW: { a: 4.5531e-5, b: 1.92, c: 0.98 },
-  AT: { a: 4.4932e-5, b: 1.92, c: 0.98 },
-  EP: { a: 4.2536e-5, b: 1.92, c: 0.98 },
-  AC: { a: 4.643e-5, b: 1.92, c: 0.98 },
-};
+export const DEFAULT_VOLUME_COEFFICIENTS: Partial<Record<SpeciesCode, VolumeCoefficients>> = {};
+
+export interface VolumeOptions {
+  /** Per-species Schumacher-Hall override (e.g. a Scenario's volumeCoefficients). */
+  coefficients?: Partial<Record<SpeciesCode, VolumeCoefficients>> | null;
+  /** BEC zone for the Kozak equations; defaults to ICH. */
+  becZone?: string | null;
+  /** Marketable top, inside-bark cm; defaults to 15 (about 6 inches). */
+  topDibCm?: number | null;
+}
 
 /**
- * Gross tree volume in m³ (rounded to 0.001). Returns 0 for missing or
- * non-positive inputs. `coeffs` (e.g. a Scenario's volumeCoefficients)
- * overrides the defaults per species.
+ * Gross merchantable volume in m³ (rounded to 0.001), stump to marketable top,
+ * from DBH and marketable height. Uses a species override from `opts.coefficients`
+ * when present, otherwise the BC Kozak 2002 BEC taper equations. Returns 0 for
+ * missing or non-positive inputs and unknown species.
  */
 export function treeVolumeM3(
   species: SpeciesCode | string | null | undefined,
   dbhCm: number | null | undefined,
   heightM: number | null | undefined,
-  coeffs?: Partial<Record<SpeciesCode, VolumeCoefficients>> | null,
+  opts: VolumeOptions = {},
 ): number {
   if (!species || !dbhCm || !heightM || !(dbhCm > 0) || !(heightM > 0)) return 0;
   const code = species.toUpperCase() as SpeciesCode;
-  const k = coeffs?.[code] ?? DEFAULT_VOLUME_COEFFICIENTS[code];
-  if (!k) return 0;
-  const v = k.a * Math.pow(dbhCm, k.b) * Math.pow(heightM, k.c);
+  const k = opts.coefficients?.[code];
+  let v: number;
+  if (k) {
+    v = k.a * Math.pow(dbhCm, k.b) * Math.pow(heightM, k.c);
+  } else {
+    const kz = kozakTreeVolume(code, dbhCm, heightM, {
+      becZone: opts.becZone ?? undefined,
+      topDibCm: opts.topDibCm ?? undefined,
+    });
+    v = kz ? kz.merchVolumeM3 : 0;
+  }
   return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0;
 }

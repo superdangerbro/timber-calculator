@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SCENARIO, DEFAULT_VOLUME_COEFFICIENTS, evaluatePole, summarize, treeVolumeM3, valueTree } from '../src';
+import { DEFAULT_SCENARIO, DEFAULT_VOLUME_COEFFICIENTS, KOZAK_SPECIES_FOR, evaluatePole, summarize, treeVolumeM3, valueTree } from '../src';
 import type { Scenario, TreeFields } from '../src';
 
 const spec = DEFAULT_SCENARIO.poleSpec;
@@ -38,24 +38,29 @@ describe('evaluatePole', () => {
 });
 
 describe('treeVolumeM3', () => {
-  it('40 cm, 30 m fir is ~1.6-1.9 m³', () => {
-    const v = treeVolumeM3('FD', 40, 30);
-    expect(v).toBeGreaterThan(1.6);
-    expect(v).toBeLessThan(1.9);
+  it('uses the BC Kozak taper equations: 40 cm fir, 22 m marketable height', () => {
+    const v = treeVolumeM3('FD', 40, 22, { becZone: 'IDF' });
+    expect(v).toBeGreaterThan(1.0);
+    expect(v).toBeLessThan(1.5);
   });
   it('all species give a sane range and grow with size', () => {
-    for (const code of Object.keys(DEFAULT_VOLUME_COEFFICIENTS)) {
-      const v = treeVolumeM3(code, 40, 30);
-      expect(v).toBeGreaterThan(1.2);
-      expect(v).toBeLessThan(2.2);
-      expect(treeVolumeM3(code, 50, 30)).toBeGreaterThan(v);
-      expect(treeVolumeM3(code, 40, 35)).toBeGreaterThan(v);
+    for (const code of Object.keys(KOZAK_SPECIES_FOR)) {
+      const v = treeVolumeM3(code, 40, 22);
+      expect(v).toBeGreaterThan(0.8);
+      expect(v).toBeLessThan(1.8);
+      expect(treeVolumeM3(code, 50, 22)).toBeGreaterThan(v);
+      expect(treeVolumeM3(code, 40, 26)).toBeGreaterThan(v);
     }
   });
+  it('BEC zone changes the answer', () => {
+    expect(treeVolumeM3('PL', 30, 18, { becZone: 'SBS' })).not.toBe(treeVolumeM3('PL', 30, 18, { becZone: 'IDF' }));
+  });
   it('custom coefficients and bad input', () => {
-    expect(treeVolumeM3('FD', 10, 10, { FD: { a: 0.001, b: 1, c: 1 } })).toBeCloseTo(0.1, 6);
+    expect(treeVolumeM3('FD', 10, 10, { coefficients: { FD: { a: 0.001, b: 1, c: 1 } } })).toBeCloseTo(0.1, 6);
+    expect(DEFAULT_VOLUME_COEFFICIENTS).toEqual({});
     expect(treeVolumeM3('FD', 0, 30)).toBe(0);
     expect(treeVolumeM3(undefined, 40, 30)).toBe(0);
+    expect(treeVolumeM3('ZZ', 40, 30)).toBe(0);
   });
 });
 

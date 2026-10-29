@@ -142,7 +142,14 @@ export interface Scenario {
   /** $ per m³ for sawlog by species. */
   sawlogPricePerM3: Partial<Record<SpeciesCode, number>>;
   poleSpec: PoleSpec;
-  /** Volume equation coefficients by species, V = a * DBH(cm)^b * H(m)^c (m³). */
+  /** BC BEC zone for the Kozak taper volume equations (e.g. "ICH", "IDF", "SBS"). Default ICH. */
+  becZone?: string;
+  /** Marketable top diameter, inside-bark cm, that spoken heights run to. Default 15 (about 6 inches). */
+  topDibCm?: number;
+  /**
+   * Optional per-species override, V = a * DBH(cm)^b * H(m)^c (m³). Species not
+   * listed use the BC Kozak taper equations.
+   */
   volumeCoefficients?: Partial<Record<SpeciesCode, { a: number; b: number; c: number }>>;
   /** Fraction of volume deducted when defects are recorded (0..1). */
   defectDeduction: number;
