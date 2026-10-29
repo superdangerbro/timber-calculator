@@ -27,6 +27,8 @@ export function rowToTree(r: TreeRow): Tree {
   return {
     id: r.id, tag: r.tag, tagNumber: r.tagNumber, prefix: r.prefix, blockId: r.blockId,
     lat: r.lat, lon: r.lon, accuracyM: r.accuracyM, fixCount: r.fixCount,
+    positionSource: (nn(r.positionSource) as Tree['positionSource']) ?? undefined,
+    gpsLat: r.gpsLat, gpsLon: r.gpsLon, gpsAccuracyM: r.gpsAccuracyM,
     status: r.status as TreeStatus, voided: r.voided,
     species: nn(r.species) as SpeciesCode | undefined, dbhCm: nn(r.dbhCm),
     circumferenceCm: nn(r.circumferenceCm), photos: nn(r.photos) ?? undefined, heightM: nn(r.heightM),
@@ -42,6 +44,8 @@ export function treeToRow(t: Tree): typeof schema.trees.$inferInsert {
   return {
     id: t.id, tag: t.tag, tagNumber: t.tagNumber, prefix: t.prefix, blockId: t.blockId ?? null,
     lat: t.lat, lon: t.lon, accuracyM: t.accuracyM ?? 0, fixCount: t.fixCount ?? 0,
+    positionSource: t.positionSource ?? null, gpsLat: t.gpsLat ?? null, gpsLon: t.gpsLon ?? null,
+    gpsAccuracyM: t.gpsAccuracyM ?? null,
     status: t.status ?? 'standing', voided: !!t.voided,
     species: t.species ?? null, dbhCm: t.dbhCm ?? null,
     circumferenceCm: t.circumferenceCm ?? null, photos: t.photos?.length ? t.photos : null, heightM: t.heightM ?? null, heightSource: t.heightSource ?? null,

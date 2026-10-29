@@ -111,3 +111,31 @@ describe('foldEvents', () => {
     expect(trees.find((t) => t.deviceId === 'dev1')!.voided).toBe(true);
   });
 });
+
+describe('adjusted positions', () => {
+  it('keeps the raw GPS fix when the pin was moved by hand', async () => {
+    const e1 = await makeEvent({
+      treeId: 'p', seq: 1, type: 'create', userId: 'u', deviceId: 'd', prevHash: '',
+      payload: {
+        tag: 'J-0009', tagNumber: 9, prefix: 'J',
+        position: { lat: 50.70005, lon: -120.35, accuracyM: 4, fixCount: 3, positionSource: 'adjusted', gpsLat: 50.7, gpsLon: -120.35, gpsAccuracyM: 4 },
+        fields: { species: 'FD' },
+      },
+    });
+    const t = foldEvents([e1])!;
+    expect(t).toMatchObject({ lat: 50.70005, lon: -120.35, positionSource: 'adjusted', gpsLat: 50.7, gpsLon: -120.35, gpsAccuracyM: 4 });
+    const e2 = await makeEvent({
+      treeId: 'p', seq: 2, type: 'update', userId: 'u', deviceId: 'd', prevHash: e1.hash,
+      payload: { position: { lat: 50.7001, lon: -120.3501, accuracyM: 4, fixCount: 3, positionSource: 'adjusted', gpsLat: 50.7, gpsLon: -120.35, gpsAccuracyM: 4 } },
+    });
+    const t2 = foldEvents([e1, e2])!;
+    expect(t2).toMatchObject({ lat: 50.7001, lon: -120.3501, positionSource: 'adjusted', gpsLat: 50.7 });
+  });
+
+  it('old events without a source fold as before', async () => {
+    const [e1] = await chain();
+    const t = foldEvents([e1])!;
+    expect(t.positionSource).toBeUndefined();
+    expect(t.lat).toBe(50.7);
+  });
+});

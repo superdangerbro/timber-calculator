@@ -277,3 +277,69 @@ describe('tally: optional voice', () => {
     expect(tts.spoken.at(-1)).toBe(tagSpeech('J-0001'));
   });
 });
+
+describe('tally: moving the pin by hand', () => {
+  it('adjustedPosition keeps the raw GPS; tiny moves stay GPS', async () => {
+    const { adjustedPosition, gpsPosition } = await import('../src/state/tally');
+    const g = gpsPosition({ lat: 50.7, lon: -120.35, accuracyM: 4, fixCount: 3 });
+    expect(g).toMatchObject({ positionSource: 'gps', gpsLat: 50.7, gpsLon: -120.35, gpsAccuracyM: 4 });
+    const a = adjustedPosition(g, 50.70005, -120.35);
+    expect(a).toMatchObject({ lat: 50.70005, positionSource: 'adjusted', gpsLat: 50.7, gpsLon: -120.35, gpsAccuracyM: 4, fixCount: 3 });
+    // Moving an adjusted pin again still remembers the original fix.
+    expect(adjustedPosition(a, 50.7001, -120.3501)).toMatchObject({ gpsLat: 50.7, gpsLon: -120.35 });
+    // Under half a metre is a slip of the finger, not a move.
+    expect(adjustedPosition(g, 50.700001, -120.35)).toMatchObject({ lat: 50.7, positionSource: 'gps' });
+  });
+
+  it('adjust, use this spot, tag: saves the moved spot and the GPS fix', async () => {
+    const { tally, repo, fix } = await makeRig();
+    tally.newTree();
+    fix(50.7, -120.35, 4);
+    tally.startAdjustPin();
+    expect(tally.getState().pin).toMatchObject({ status: 'pinned', adjusting: true });
+    tally.movePin(50.70006, -120.35008);
+    tally.finishAdjustPin();
+    expect(tally.getState().pin.adjusting).toBeFalsy();
+    tally.setField(FULL);
+    tally.goPhoto();
+    await tally.getTag();
+    const create = repo.getState().events.map((e) => e.event).find((e) => e.type === 'create')!;
+    expect(create.payload.position).toMatchObject({ lat: 50.70006, lon: -120.35008, positionSource: 'adjusted', gpsLat: 50.7, gpsLon: -120.35, gpsAccuracyM: 4, fixCount: 1 });
+    const tree = repo.getState().trees[0];
+    expect(tree).toMatchObject({ lat: 50.70006, positionSource: 'adjusted', gpsLat: 50.7 });
+  });
+
+  it('cancel puts the pin back; GPS-only trees say so', async () => {
+    const { tally, repo, fix } = await makeRig();
+    tally.newTree();
+    fix(50.7, -120.35, 4);
+    tally.pinNow();
+    tally.startAdjustPin();
+    tally.movePin(50.7003, -120.3503);
+    tally.cancelAdjustPin();
+    expect(tally.getState().pin.position).toMatchObject({ lat: 50.7, positionSource: 'gps' });
+    tally.setField(FULL);
+    tally.goPhoto();
+    await tally.getTag();
+    expect(repo.getState().trees[0]).toMatchObject({ lat: 50.7, positionSource: 'gps', gpsLat: 50.7 });
+  });
+
+  it('moveTree writes an update event with the adjusted position', async () => {
+    const { tally, repo, fix } = await makeRig();
+    const { adjustedPosition } = await import('../src/state/tally');
+    tally.newTree();
+    fix(50.7, -120.35, 4);
+    tally.pinNow();
+    tally.setField(FULL);
+    tally.goPhoto();
+    await tally.getTag();
+    const tree = repo.getState().trees[0];
+    const pos = adjustedPosition({ lat: tree.lat, lon: tree.lon, accuracyM: tree.accuracyM, fixCount: tree.fixCount, gpsLat: tree.gpsLat ?? undefined, gpsLon: tree.gpsLon ?? undefined, gpsAccuracyM: tree.gpsAccuracyM ?? undefined }, 50.7002, -120.3502);
+    await repo.moveTree(tree.id, pos);
+    const last = repo.getState().events.map((e) => e.event).filter((e) => e.treeId === tree.id).at(-1)!;
+    expect(last.type).toBe('update');
+    expect(last.payload.position).toMatchObject({ lat: 50.7002, positionSource: 'adjusted', gpsLat: 50.7 });
+    expect(repo.getState().trees[0]).toMatchObject({ lat: 50.7002, positionSource: 'adjusted', gpsLat: 50.7, version: 2 });
+    expect((await verifyChain(repo.getState().events.map((e) => e.event))).ok).toBe(true);
+  });
+});

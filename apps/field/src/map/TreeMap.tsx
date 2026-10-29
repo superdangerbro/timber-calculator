@@ -29,6 +29,12 @@ interface Props {
   padTop?: number;
   /** Change to make the map re-read imagery tiles (e.g. after an offline download). */
   tileVersion?: number | string;
+  /** The tree pin being placed. Shown as a draggable marker; the map zooms to it once. */
+  pin?: { lat: number; lon: number } | null;
+  /** Adjust mode: a fixed crosshair sits in the middle and the map pans under it. */
+  adjusting?: boolean;
+  /** The pin was dragged, or the map was panned under the crosshair. */
+  onPinMove?: (lat: number, lon: number) => void;
 }
 
 const DEFAULT_CENTER: [number, number] = [-120.35, 50.7];
@@ -147,7 +153,23 @@ function webglAvailable() {
   }
 }
 
-export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelect, rings, className, testId, fit = 'follow', padTop = 0, tileVersion }: Props) {
+export function TreeMap({
+  trees,
+  blocks,
+  position,
+  selectedId,
+  labelIds,
+  onSelect,
+  rings,
+  className,
+  testId,
+  fit = 'follow',
+  padTop = 0,
+  tileVersion,
+  pin,
+  adjusting = false,
+  onPinMove,
+}: Props) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -158,6 +180,12 @@ export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelec
   const [zoom, setZoom] = useState(15);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onPinMoveRef = useRef(onPinMove);
+  onPinMoveRef.current = onPinMove;
+  const adjustingRef = useRef(adjusting);
+  adjustingRef.current = adjusting;
+  const pinMarker = useRef<maplibregl.Marker | null>(null);
+  const pinShown = useRef(false);
 
   useEffect(() => {
     if (!el.current) return;
@@ -195,6 +223,12 @@ export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelec
       setZoom(map.getZoom());
     });
     map.on('dragstart', () => (following.current = false));
+    // Adjust mode: whatever is under the crosshair (the map centre) is the tree.
+    map.on('move', (e) => {
+      if (!adjustingRef.current || !(e as { originalEvent?: unknown }).originalEvent) return;
+      const c = map.getCenter();
+      onPinMoveRef.current?.(c.lat, c.lng);
+    });
     if (testId) ((window as unknown as { __fieldMaps?: Record<string, maplibregl.Map> }).__fieldMaps ??= {})[testId] = map; // e2e hook
     map.on('click', 'trees', (e) => {
       const id = e.features?.[0]?.properties?.id;
@@ -293,6 +327,57 @@ export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelec
     (map.getSource('me') as GeoJSONSource).setData({ type: 'FeatureCollection', features: feats });
   }, [position?.lat, position?.lon, position?.accuracyM, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The tree pin: a draggable marker; first appearance zooms in to it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    if (!pin) {
+      pinMarker.current?.remove();
+      pinMarker.current = null;
+      pinShown.current = false;
+      return;
+    }
+    if (!pinMarker.current) {
+      const div = document.createElement('div');
+      div.className = 'tree-pin';
+      div.setAttribute('data-testid', 'tree-pin');
+      div.innerHTML =
+        '<svg width="40" height="52" viewBox="0 0 40 52"><path d="M20 51C20 51 37 31 37 19A17 17 0 0 0 3 19C3 31 20 51 20 51Z" fill="#ff6b1a" stroke="#1a0d04" stroke-width="2.5"/><circle cx="20" cy="19" r="6.5" fill="#1a0d04"/></svg>';
+      const m = new maplibregl.Marker({ element: div, anchor: 'bottom', draggable: true }).setLngLat([pin.lon, pin.lat]).addTo(map);
+      m.on('dragend', () => {
+        const ll = m.getLngLat();
+        onPinMoveRef.current?.(ll.lat, ll.lng);
+      });
+      pinMarker.current = m;
+    } else if (!adjusting) {
+      pinMarker.current.setLngLat([pin.lon, pin.lat]);
+    }
+    if (!pinShown.current) {
+      pinShown.current = true;
+      following.current = false;
+      // Nudge down so the whole pin (anchored at its tip) shows in the short map strip.
+      map.easeTo({ center: [pin.lon, pin.lat], zoom: Math.max(map.getZoom(), 18), offset: [0, 24], duration: 0 });
+    }
+  }, [pin?.lat, pin?.lon, loaded, adjusting]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Entering adjust mode: centre on the pin so the crosshair starts on it; hide the marker.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    const el2 = pinMarker.current?.getElement();
+    if (el2) el2.style.visibility = adjusting ? 'hidden' : 'visible';
+    if (adjusting && pin) {
+      following.current = false;
+      map.resize();
+      map.jumpTo({ center: [pin.lon, pin.lat], zoom: Math.max(map.getZoom(), 18) });
+    }
+    if (!adjusting && pin && pinMarker.current) {
+      pinMarker.current.setLngLat([pin.lon, pin.lat]);
+      map.resize();
+      map.easeTo({ center: [pin.lon, pin.lat], offset: [0, 24], duration: 0 });
+    }
+  }, [adjusting, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const recenter = () => {
     following.current = true;
     if (position && mapRef.current) mapRef.current.easeTo({ center: [position.lon, position.lat], zoom: 17, duration: 300 });
@@ -302,6 +387,17 @@ export function TreeMap({ trees, blocks, position, selectedId, labelIds, onSelec
     <div className={`tree-map ${className ?? ''}`} data-testid={testId}>
       <div ref={el} className="tree-map-canvas" />
       {failed && <div className="map-fallback">Map unavailable (no WebGL)</div>}
+      {adjusting && (
+        <div className="pin-crosshair" data-testid="pin-crosshair" aria-hidden>
+          <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+            <circle cx="48" cy="48" r="22" stroke="#000" strokeOpacity=".45" strokeWidth="8" />
+            <circle cx="48" cy="48" r="22" stroke="#ff6b1a" strokeWidth="4" />
+            <circle cx="48" cy="48" r="3.5" fill="#ff6b1a" />
+            <path d="M48 4v26M48 66v26M4 48h26M66 48h26" stroke="#000" strokeOpacity=".45" strokeWidth="8" strokeLinecap="round" />
+            <path d="M48 4v26M48 66v26M4 48h26M66 48h26" stroke="#ff6b1a" strokeWidth="4" strokeLinecap="round" />
+          </svg>
+        </div>
+      )}
       <button className="map-btn" aria-label="Center on me" onClick={recenter}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm0-4a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />

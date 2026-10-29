@@ -13,6 +13,7 @@ import {
   type TreeEventType,
   type TreeFields,
   type TreePhoto,
+  type TreePosition,
   type TreeStatus,
 } from '@timber/core';
 import { blobBytes, sha256Hex } from '../lib/photo';
@@ -209,7 +210,7 @@ export class Repo extends Emitter<RepoState> {
     return event;
   }
 
-  createTree(fields: TreeFields, position: AveragedPosition | null): Promise<Tree> {
+  createTree(fields: TreeFields, position: TreePosition | AveragedPosition | null): Promise<Tree> {
     return this.enqueue(async () => {
       const leave = !!fields.leaveTree;
       const { tag, tagNumber } = this.peekTag(leave);
@@ -283,6 +284,10 @@ export class Repo extends Emitter<RepoState> {
 
   updateTree(treeId: string, fields: TreeFields) {
     return this.enqueue(() => this.append(treeId, 'update', { fields }));
+  }
+  /** Move a saved tree by hand. The raw GPS fix is kept in gpsLat/gpsLon. */
+  moveTree(treeId: string, position: TreePosition) {
+    return this.enqueue(() => this.append(treeId, 'update', { position }));
   }
   voidTree(treeId: string, reason?: string) {
     return this.enqueue(() => this.append(treeId, 'void', reason ? { reason } : {}));

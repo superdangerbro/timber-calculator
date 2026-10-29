@@ -543,6 +543,116 @@ try {
   await tid('tab-settings').click();
   await tid('units-imperial').click();
 
+
+  // ---------------------------------------------------------------- v4: move the pin by hand, no voice
+  const V4 = join(here, '../../../screenshots-tmp/v4');
+  mkdirSync(V4, { recursive: true });
+  const shot4 = async (name) => {
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: join(V4, `${name}.png`) });
+    console.log('    screenshot v4', name);
+  };
+  const createdPos = (tag) => page.evaluate((tag) => new Promise((res, rej) => {
+    const r = indexedDB.open('timber-field');
+    r.onerror = () => rej(r.error);
+    r.onsuccess = () => {
+      const q = r.result.transaction('events').objectStore('events').getAll();
+      q.onsuccess = () => {
+        const evs = q.result.map((row) => row.event);
+        const c = evs.find((e) => e.type === 'create' && e.payload.tag === tag);
+        const ups = evs.filter((e) => c && e.treeId === c.treeId && e.type === 'update' && e.payload.position);
+        res({ create: c?.payload.position, update: ups.at(-1)?.payload.position });
+      };
+    };
+  }), tag);
+  /** Pan a map with a real mouse drag, the way a finger would. */
+  const dragMap = async (sel, dx, dy) => {
+    const box = await page.locator(sel).boundingBox();
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx / 2, y + dy / 2, { steps: 6 });
+    await page.mouse.move(x + dx, y + dy, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+  };
+  await tid('tab-tally').click();
+  assert(await tid('new-tree').isVisible(), 'New tree is the big idle button');
+  await moveTo(120, 30);
+  await startTree();
+  await pinNow();
+  await shot4('field-v4-01-pinned-zoomed');
+  await tid('adjust-pin').click();
+  await tid('adjust-panel').waitFor();
+  await tid('pin-crosshair').waitFor();
+  await shot4('field-v4-02-adjust-crosshair');
+  await dragMap('[data-testid=tally-map] canvas', -90, 70);
+  await page.waitForFunction(() => /moved/.test(document.querySelector('[data-testid=adjust-offset]')?.textContent ?? ''), null, { timeout: 5000 });
+  log('Adjust offset:', (await tid('adjust-offset').textContent()).trim());
+  await shot4('field-v4-03-adjust-moved');
+  await tid('adjust-use').click();
+  await tid('adjust-panel').waitFor({ state: 'detached' });
+  assert(await page.locator('[data-testid=pinbar].moved').count(), 'pin bar shows the hand-placed pin');
+  await shot4('field-v4-04-pinbar-moved');
+  await fillTree({ sp: 'FD', circ: 70, height: 90, s: 4, t: 5, b: 5 });
+  const movedTag = await tagIt();
+  const mp = (await createdPos(movedTag)).create;
+  assert(mp && mp.positionSource === 'adjusted' && typeof mp.gpsLat === 'number' && (mp.lat !== mp.gpsLat || mp.lon !== mp.gpsLon),
+    'saved adjusted position with raw GPS: ' + JSON.stringify(mp));
+  log(`${movedTag} saved adjusted: ${mp.lat.toFixed(6)},${mp.lon.toFixed(6)} (GPS ${mp.gpsLat.toFixed(6)},${mp.gpsLon.toFixed(6)})`);
+  await shot4('field-v4-05-saved');
+
+  // Info card -> Move pin on map -> Save spot writes an update event.
+  const pt4 = await page.evaluate((tag) => {
+    const m = window.__fieldMaps['tally-map'];
+    const f = m.querySourceFeatures('trees').find((x) => x.properties.tag === tag);
+    if (!f) return null;
+    m.jumpTo({ center: f.geometry.coordinates });
+    const p = m.project(f.geometry.coordinates);
+    const r = m.getCanvas().getBoundingClientRect();
+    return { x: r.left + p.x, y: r.top + p.y };
+  }, movedTag);
+  assert(pt4, 'moved tree dot on map');
+  await page.waitForTimeout(400);
+  await page.mouse.click(pt4.x, pt4.y);
+  await tid('tree-card').waitFor({ timeout: 5000 });
+  await tid('card-moved').waitFor();
+  log('Card:', (await tid('card-moved').textContent()).trim());
+  await shot4('field-v4-06-card-placed-by-hand');
+  await tid('card-move-pin').click();
+  await tid('move-tree').waitFor();
+  await page.waitForTimeout(600);
+  await shot4('field-v4-07-move-tree');
+  await dragMap('[data-testid=move-map] canvas', 60, -50);
+  await page.waitForFunction(() => /moved/.test(document.querySelector('[data-testid=move-offset]')?.textContent ?? ''), null, { timeout: 5000 });
+  await shot4('field-v4-08-move-tree-dragged');
+  await tid('move-save').click();
+  await tid('move-tree').waitFor({ state: 'detached' });
+  const up = (await createdPos(movedTag)).update;
+  assert(up && up.positionSource === 'adjusted' && up.gpsLat === mp.gpsLat && (up.lat !== mp.lat || up.lon !== mp.lon),
+    'update event moved the tree: ' + JSON.stringify(up));
+  log('Moved again from the card, raw GPS kept');
+  await shot4('field-v4-09-card-after-move');
+  await page.locator('[data-testid=tree-card] .icon-btn[aria-label=Close]').click();
+
+  // Tree editor has Move pin too.
+  await tid('tab-trees').click();
+  await tid('when-all').click();
+  await tid(`row-${movedTag}`).click();
+  await tid('tree-editor').waitFor();
+  await tid('editor-moved').waitFor();
+  await tid('editor-move-pin').waitFor();
+  await shot4('field-v4-10-editor-move-pin');
+  await tid('editor-move-pin').click();
+  await tid('move-tree').waitFor();
+  await tid('move-cancel').click();
+  await tid('move-tree').waitFor({ state: 'detached' });
+  await page.locator('[data-testid=tree-editor] .icon-btn[aria-label=Close]').click();
+  await tid('tree-editor').waitFor({ state: 'detached' });
+  await tid('tab-tally').click();
+  await page.waitForTimeout(400);
+  await shot4('field-v4-00-idle-new-tree');
+
   const relevant = errors.filter((e) => !/net::ERR_INTERNET_DISCONNECTED|Failed to load resource/.test(e));
   if (relevant.length) {
     console.log('CONSOLE ERRORS:\n' + relevant.join('\n'));

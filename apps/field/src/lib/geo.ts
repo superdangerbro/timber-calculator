@@ -20,6 +20,18 @@ export function compassPoint(deg: number) {
   return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 }
 
+/** "moved 6 m NE" (or ft) from the raw GPS fix, or null when the pin sits on the fix. */
+export function pinOffsetText(
+  p: { lat: number; lon: number; positionSource?: string | null; gpsLat?: number | null; gpsLon?: number | null } | null | undefined,
+  units: 'metric' | 'imperial',
+): string | null {
+  if (!p || p.positionSource !== 'adjusted' || typeof p.gpsLat !== 'number' || typeof p.gpsLon !== 'number') return null;
+  const from = { lat: p.gpsLat, lon: p.gpsLon };
+  const d = distanceM(from, p);
+  const dist = units === 'imperial' ? `${Math.round(d / 0.3048)} ft` : `${d < 10 ? d.toFixed(1) : Math.round(d)} m`;
+  return `moved ${dist} ${compassPoint(bearingDeg(from, p))} from GPS`;
+}
+
 export function circlePolygon(lat: number, lon: number, radiusM: number, steps = 48): GeoJSON.Polygon {
   const ring: [number, number][] = [];
   for (let i = 0; i <= steps; i++) {

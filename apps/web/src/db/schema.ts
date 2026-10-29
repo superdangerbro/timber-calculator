@@ -54,6 +54,11 @@ export const trees = pgTable('trees', {
   lon: doublePrecision('lon').notNull(),
   accuracyM: doublePrecision('accuracy_m').notNull().default(0),
   fixCount: integer('fix_count').notNull().default(0),
+  /** 'adjusted' when the pin was moved by hand; the raw averaged fix is kept in gps_*. */
+  positionSource: text('position_source'),
+  gpsLat: doublePrecision('gps_lat'),
+  gpsLon: doublePrecision('gps_lon'),
+  gpsAccuracyM: doublePrecision('gps_accuracy_m'),
   status: text('status').notNull().default('standing'),
   voided: boolean('voided').notNull().default(false),
   species: text('species'),

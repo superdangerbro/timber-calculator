@@ -45,6 +45,20 @@ export interface AveragedPosition {
   fixCount: number;
 }
 
+export type PositionSource = 'gps' | 'adjusted';
+
+/**
+ * Position written in create/update payloads. When the cruiser moves the pin by
+ * hand, lat/lon are the adjusted spot and gpsLat/gpsLon/gpsAccuracyM keep the raw
+ * averaged fix, so the record still shows where the phone actually was.
+ */
+export interface TreePosition extends AveragedPosition {
+  positionSource?: PositionSource;
+  gpsLat?: number;
+  gpsLon?: number;
+  gpsAccuracyM?: number;
+}
+
 /** Everything that can be measured or said about a tree. All optional while drafting. */
 export interface TreeFields {
   species?: SpeciesCode;
@@ -118,6 +132,11 @@ export interface Tree extends TreeFields {
   lon: number;
   accuracyM: number;
   fixCount: number;
+  /** 'adjusted' when the pin was moved by hand; the raw fix is in gpsLat/gpsLon. */
+  positionSource?: PositionSource;
+  gpsLat?: number | null;
+  gpsLon?: number | null;
+  gpsAccuracyM?: number | null;
   status: TreeStatus;
   voided: boolean;
   stumpDiameterCm?: number | null;

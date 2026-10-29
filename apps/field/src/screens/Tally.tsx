@@ -10,6 +10,7 @@ import { PhotoButtons } from '../components/Photos';
 import { TreeCard } from '../components/TreeCard';
 import { TreeMap } from '../map/TreeMap';
 import { isToday } from '../state/repo';
+import { pinOffsetText } from '../lib/geo';
 import { capturePhoto, compressImage } from '../lib/photo';
 import { dbhFromCirc, girthToCm, girthUnit, heightToM, heightUnit, showGirth, showHeight } from '../lib/units';
 import { money, safeSummary, safeValue, sawlogM3, scenarioPriced } from '../lib/valuation';
@@ -69,7 +70,19 @@ function TagHero({ tag, fresh }: { tag: string | null; fresh: boolean }) {
   );
 }
 
-function PinBar({ t, onRePin, onPinNow, units }: { t: TallyState; onRePin: () => void; onPinNow: () => void; units: UnitSystem }) {
+function PinBar({
+  t,
+  onRePin,
+  onPinNow,
+  onAdjust,
+  units,
+}: {
+  t: TallyState;
+  onRePin: () => void;
+  onPinNow: () => void;
+  onAdjust: () => void;
+  units: UnitSystem;
+}) {
   const { gps } = useApp();
   const g = useEmitter(gps);
   const ft = (m: number) => (units === 'imperial' ? `±${Math.round(m / 0.3048)} ft` : `±${m.toFixed(1)} m`);
@@ -85,20 +98,59 @@ function PinBar({ t, onRePin, onPinNow, units }: { t: TallyState; onRePin: () =>
         <button className="btn ghost small" onClick={onPinNow} disabled={!a} data-testid="pin-now">
           Pin now
         </button>
+        <button className="btn ghost small" onClick={onAdjust} data-testid="adjust-pin">
+          Adjust
+        </button>
       </div>
     );
   }
   const p = t.pin.position;
+  const moved = pinOffsetText(p, units);
   return (
-    <div className={`pinbar ${p ? 'pinned' : 'nofix'}`} data-testid="pinbar">
+    <div className={`pinbar ${p ? (moved ? 'pinned moved' : 'pinned') : 'nofix'}`} data-testid="pinbar">
       <Icon name={p ? 'check' : 'alert'} size={22} stroke={2.6} />
       <div className="pinbar-text">
-        <b>{p ? 'Location pinned' : 'No GPS fix'}</b>
-        <span data-testid="pin-accuracy">{p ? `${ft(p.accuracyM)} · ${p.fixCount} fix${p.fixCount === 1 ? '' : 'es'}` : 'tap Re-pin when you have signal'}</span>
+        <b>{p ? (moved ? 'Pin placed by hand' : 'Location pinned') : 'No GPS fix'}</b>
+        <span data-testid="pin-accuracy">
+          {p ? moved ?? `${ft(p.accuracyM)} · ${p.fixCount} fix${p.fixCount === 1 ? '' : 'es'}` : 'Re-pin, or place it on the map'}
+        </span>
       </div>
+      <button className="btn ghost small" onClick={onAdjust} data-testid="adjust-pin">
+        Adjust
+      </button>
       <button className="btn ghost small" onClick={onRePin} data-testid="re-pin">
         Re-pin
       </button>
+    </div>
+  );
+}
+
+/** Full-map "Adjust pin" mode: pan the map under the crosshair, or drag the pin. */
+function AdjustPanel({ t, units }: { t: TallyState; units: UnitSystem }) {
+  const { tally } = useApp();
+  const p = t.pin.position;
+  const moved = pinOffsetText(p, units);
+  const canReset = !!moved;
+  return (
+    <div className="adjust-panel" data-testid="adjust-panel">
+      <div className="adjust-title">
+        <Icon name="gps" size={22} />
+        <div>
+          <b>Put the crosshair on the tree</b>
+          <span data-testid="adjust-offset">{moved ?? 'On the GPS fix. Drag the map to move it.'}</span>
+        </div>
+      </div>
+      <div className="adjust-actions">
+        <button className="btn ghost" onClick={() => tally.cancelAdjustPin()} data-testid="adjust-cancel">
+          Cancel
+        </button>
+        <button className="btn ghost" onClick={() => tally.resetPinToGps()} disabled={!canReset} data-testid="adjust-reset">
+          Back to GPS
+        </button>
+        <button className="btn primary" onClick={() => tally.finishAdjustPin()} data-testid="adjust-use">
+          Use this spot
+        </button>
+      </div>
     </div>
   );
 }
@@ -503,13 +555,18 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
   }, [today, scenario]);
 
   const inTree = t.step === 'measure' || t.step === 'photo';
+  const adjusting = inTree && !!t.pin.adjusting;
   const pinned = t.pin.status === 'pinned';
-  const position = t.pin.position ?? (g.averaging && g.averaged ? g.averaged : g.last);
+  // Once pinned, the blue dot is the averaged GPS fix (not a hand-moved pin), so the offset shows.
+  const pp = t.pin.position;
+  const position = pp
+    ? { lat: pp.gpsLat ?? pp.lat, lon: pp.gpsLon ?? pp.lon, accuracyM: pp.gpsAccuracyM ?? pp.accuracyM }
+    : g.averaging && g.averaged ? g.averaged : g.last;
   const fresh = t.step === 'saved' && !r.clashes.some((c) => c.tree.id === t.lastTreeId);
   const lastTree = t.lastTreeId ? repo.tree(t.lastTreeId) : undefined;
 
   return (
-    <div className={`tally step-${t.step}${inTree ? ' in-tree' : ''}`} data-phase={t.step} data-step={t.step}>
+    <div className={`tally step-${t.step}${inTree ? ' in-tree' : ''}${adjusting ? ' adjusting' : ''}`} data-phase={t.step} data-step={t.step}>
       <div className="tally-map">
         <TreeMap
           trees={today}
@@ -518,8 +575,11 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
           labelIds={t.lastTreeId ? [t.lastTreeId] : []}
           rings={rings}
           padTop={0}
-          onSelect={setCardId}
+          onSelect={adjusting ? undefined : setCardId}
           testId="tally-map"
+          pin={inTree && t.pin.position ? { lat: t.pin.position.lat, lon: t.pin.position.lon } : null}
+          adjusting={adjusting}
+          onPinMove={(lat, lon) => tally.movePin(lat, lon)}
         />
         <div className="map-chips">
           <GpsChip />
@@ -558,83 +618,89 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
         <div className="sheet-grip">
           <span />
         </div>
-        <ClashBanner />
-        {t.step !== 'idle' && <StepBar step={t.step} pinned={pinned} />}
+        {adjusting ? (
+          <AdjustPanel t={t} units={units} />
+        ) : (
+          <>
+            <ClashBanner />
+            {t.step !== 'idle' && <StepBar step={t.step} pinned={pinned} />}
 
-        <div className="sheet-body" ref={bodyRef}>
-          {t.step === 'measure' && (
-            <>
-              <PinBar t={t} units={units} onRePin={() => tally.rePin()} onPinNow={() => tally.pinNow()} />
-              <TreeForm t={t} units={units} measure={measure} onMeasure={onMeasure} />
-            </>
-          )}
-          {t.step === 'photo' && (
-            <>
-              <PinBar t={t} units={units} onRePin={() => tally.rePin()} onPinNow={() => tally.pinNow()} />
-              <PhotoStep t={t} />
-            </>
-          )}
-          {(t.step === 'idle' || t.step === 'saved') && (
-            <>
-              <TagHero tag={t.lastTag} fresh={fresh} />
-              {t.lastTag && lastTree && (
-                <div className="saved-actions">
-                  <button className="btn ghost" onClick={() => tally.requestPhoto()} data-testid="saved-photo">
-                    <Icon name="camera" size={22} />
-                    Photo{(lastTree.photos?.length ?? 0) > 0 ? ` (${lastTree.photos?.length})` : ''}
-                  </button>
-                  <button className="btn ghost" onClick={() => void tally.repeat()} data-testid="repeat">
-                    <Icon name="speaker" size={22} /> Say it
-                  </button>
-                  <button className="btn ghost" onClick={() => void tally.undo()} data-testid="undo">
-                    <Icon name="undo" size={22} /> Undo
-                  </button>
-                </div>
+            <div className="sheet-body" ref={bodyRef}>
+              {t.step === 'measure' && (
+                <>
+                  <PinBar t={t} units={units} onRePin={() => tally.rePin()} onPinNow={() => tally.pinNow()} onAdjust={() => tally.startAdjustPin()} />
+                  <TreeForm t={t} units={units} measure={measure} onMeasure={onMeasure} />
+                </>
               )}
-            </>
-          )}
-        </div>
+              {t.step === 'photo' && (
+                <>
+                  <PinBar t={t} units={units} onRePin={() => tally.rePin()} onPinNow={() => tally.pinNow()} onAdjust={() => tally.startAdjustPin()} />
+                  <PhotoStep t={t} />
+                </>
+              )}
+              {(t.step === 'idle' || t.step === 'saved') && (
+                <>
+                  <TagHero tag={t.lastTag} fresh={fresh} />
+                  {t.lastTag && lastTree && (
+                    <div className="saved-actions">
+                      <button className="btn ghost" onClick={() => tally.requestPhoto()} data-testid="saved-photo">
+                        <Icon name="camera" size={22} />
+                        Photo{(lastTree.photos?.length ?? 0) > 0 ? ` (${lastTree.photos?.length})` : ''}
+                      </button>
+                      <button className="btn ghost" onClick={() => void tally.repeat()} data-testid="repeat">
+                        <Icon name="speaker" size={22} /> Say it
+                      </button>
+                      <button className="btn ghost" onClick={() => void tally.undo()} data-testid="undo">
+                        <Icon name="undo" size={22} /> Undo
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
-        {t.voice && <VoicePanel t={t} measure={measure} units={units} />}
+            {t.voice && <VoicePanel t={t} measure={measure} units={units} />}
 
-        {t.notice && (
-          <div className="tally-toast" data-testid="notice" role="status">
-            {t.notice}
-          </div>
+            {t.notice && (
+              <div className="tally-toast" data-testid="notice" role="status">
+                {t.notice}
+              </div>
+            )}
+
+            <div className="step-actions">
+              <MicButton t={t} />
+              {t.step === 'measure' && (
+                <>
+                  <button className="btn ghost act-side" onClick={() => tally.cancelTree()} data-testid="cancel-tree">
+                    Cancel
+                  </button>
+                  <button className="act-main" onClick={() => tally.goPhoto()} data-testid="next-photo">
+                    <span>Next: photo</span>
+                    <span className="arrow-right">
+                      <Icon name="arrow" size={26} stroke={2.6} />
+                    </span>
+                  </button>
+                </>
+              )}
+              {t.step === 'photo' && (
+                <>
+                  <button className="btn ghost act-side" onClick={() => tally.backToMeasure()} data-testid="back-measure">
+                    Back
+                  </button>
+                  <button className="act-main tag" onClick={() => void tally.getTag()} data-testid="get-tag">
+                    <span>{t.pendingPhotos.length ? 'Get tag number' : 'Skip photo · get tag'}</span>
+                  </button>
+                </>
+              )}
+              {(t.step === 'idle' || t.step === 'saved') && (
+                <button className="act-main new" onClick={() => tally.newTree()} data-testid="new-tree">
+                  <Icon name="tree" size={30} stroke={2.4} />
+                  <span>New tree</span>
+                </button>
+              )}
+            </div>
+          </>
         )}
-
-        <div className="step-actions">
-          <MicButton t={t} />
-          {t.step === 'measure' && (
-            <>
-              <button className="btn ghost act-side" onClick={() => tally.cancelTree()} data-testid="cancel-tree">
-                Cancel
-              </button>
-              <button className="act-main" onClick={() => tally.goPhoto()} data-testid="next-photo">
-                <span>Next: photo</span>
-                <span className="arrow-right">
-                  <Icon name="arrow" size={26} stroke={2.6} />
-                </span>
-              </button>
-            </>
-          )}
-          {t.step === 'photo' && (
-            <>
-              <button className="btn ghost act-side" onClick={() => tally.backToMeasure()} data-testid="back-measure">
-                Back
-              </button>
-              <button className="act-main tag" onClick={() => void tally.getTag()} data-testid="get-tag">
-                <span>{t.pendingPhotos.length ? 'Get tag number' : 'Skip photo · get tag'}</span>
-              </button>
-            </>
-          )}
-          {(t.step === 'idle' || t.step === 'saved') && (
-            <button className="act-main new" onClick={() => tally.newTree()} data-testid="new-tree">
-              <Icon name="tree" size={30} stroke={2.4} />
-              <span>New tree</span>
-            </button>
-          )}
-        </div>
       </section>
 
       {t.confirmMissing && (

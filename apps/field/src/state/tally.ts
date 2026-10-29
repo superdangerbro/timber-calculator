@@ -7,6 +7,7 @@ import {
   tagSpeech,
   type AveragedPosition,
   type ParseResult,
+  type TreePosition,
   type TreeFields,
   type VoiceCommand,
 } from '@timber/core';
@@ -24,8 +25,54 @@ export type MicState = 'off' | 'listening' | 'thinking';
 
 export interface PinState {
   status: 'none' | 'pinning' | 'pinned';
-  /** The position that will be saved with the tree (fixed once pinned). */
-  position: AveragedPosition | null;
+  /** The position that will be saved with the tree (fixed once pinned; may be moved by hand). */
+  position: TreePosition | null;
+  /** The map is in "Adjust pin" mode: the cruiser drags the map under a crosshair. */
+  adjusting?: boolean;
+  /** Position before adjusting started, restored by "Cancel". */
+  beforeAdjust?: TreePosition | null;
+}
+
+/** Below this, a hand move is treated as no move (finger jitter). */
+const ADJUST_MIN_M = 0.5;
+
+function metresBetween(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+  const r = Math.PI / 180;
+  const x = (b.lon - a.lon) * r * Math.cos(((a.lat + b.lat) / 2) * r);
+  const y = (b.lat - a.lat) * r;
+  return Math.sqrt(x * x + y * y) * 6371008.8;
+}
+
+/** A GPS-pinned position, carrying the raw fix alongside for accountability. */
+export function gpsPosition(p: AveragedPosition): TreePosition {
+  return { ...p, positionSource: 'gps', gpsLat: p.lat, gpsLon: p.lon, gpsAccuracyM: p.accuracyM };
+}
+
+/**
+ * Move a position by hand. lat/lon become the chosen spot; the raw averaged fix
+ * stays in gpsLat/gpsLon/gpsAccuracyM. Moving back onto the fix makes it 'gps' again.
+ */
+export function adjustedPosition(base: TreePosition | AveragedPosition | null, lat: number, lon: number): TreePosition {
+  const b = base as TreePosition | null;
+  const gpsLat = b?.gpsLat ?? b?.lat;
+  const gpsLon = b?.gpsLon ?? b?.lon;
+  const gpsAccuracyM = b?.gpsAccuracyM ?? b?.accuracyM;
+  const out: TreePosition = {
+    lat,
+    lon,
+    accuracyM: b?.accuracyM ?? 0,
+    fixCount: b?.fixCount ?? 0,
+    positionSource: 'adjusted',
+  };
+  if (typeof gpsLat === 'number' && typeof gpsLon === 'number') {
+    out.gpsLat = gpsLat;
+    out.gpsLon = gpsLon;
+    if (typeof gpsAccuracyM === 'number') out.gpsAccuracyM = gpsAccuracyM;
+    if (metresBetween({ lat: gpsLat, lon: gpsLon }, { lat, lon }) < ADJUST_MIN_M) {
+      return { ...out, lat: gpsLat, lon: gpsLon, positionSource: 'gps' };
+    }
+  }
+  return out;
 }
 
 /** A photo taken before the tree has its tag; attached when the tag is issued. */
@@ -204,11 +251,50 @@ export class TallyController extends Emitter<TallyState> {
   pinNow() {
     if (this.state.pin.status !== 'pinning') return;
     this.clearPinTimer();
-    const position = this.deps.gps.endTree();
+    const fix = this.deps.gps.endTree();
+    const position = fix ? gpsPosition(fix) : null;
     this.setState({
       pin: { status: 'pinned', position },
-      notice: position ? null : 'No GPS fix yet. Tap Re-pin when you have one.',
+      notice: position ? null : 'No GPS fix yet. Tap Re-pin, or Adjust pin to place it on the map.',
     });
+  }
+
+  // ------------------------------------------------------------ adjust the pin by hand
+
+  /** Enter "Adjust pin": the map takes over the screen with a crosshair to drag under. */
+  startAdjustPin() {
+    if (this.state.step !== 'measure' && this.state.step !== 'photo') return;
+    if (this.state.pin.status === 'pinning') this.pinNow();
+    const pin = this.state.pin;
+    this.setState({ pin: { ...pin, status: 'pinned', adjusting: true, beforeAdjust: pin.position } });
+  }
+
+  /** The crosshair (or the dragged marker) is now over lat/lon. */
+  movePin(lat: number, lon: number) {
+    const pin = this.state.pin;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    this.setState({ pin: { ...pin, status: 'pinned', position: adjustedPosition(pin.position, lat, lon) } });
+  }
+
+  /** "Use this spot". */
+  finishAdjustPin() {
+    const pin = this.state.pin;
+    const moved = pin.position?.positionSource === 'adjusted';
+    this.setState({ pin: { status: 'pinned', position: pin.position }, notice: moved ? 'Pin moved by hand' : null });
+  }
+
+  /** Leave adjust mode without changing the pin. */
+  cancelAdjustPin() {
+    const pin = this.state.pin;
+    this.setState({ pin: { status: 'pinned', position: pin.beforeAdjust ?? pin.position } });
+  }
+
+  /** Put the pin back on the averaged GPS fix. */
+  resetPinToGps() {
+    const p = this.state.pin.position;
+    if (!p || typeof p.gpsLat !== 'number' || typeof p.gpsLon !== 'number') return;
+    const fix: AveragedPosition = { lat: p.gpsLat, lon: p.gpsLon, accuracyM: p.gpsAccuracyM ?? p.accuracyM, fixCount: p.fixCount };
+    this.setState({ pin: { ...this.state.pin, position: gpsPosition(fix) } });
   }
 
   /** Form / editor input for the current tree. Starts a tree if none is open. */
@@ -275,7 +361,9 @@ export class TallyController extends Emitter<TallyState> {
       return;
     }
     if (this.state.pin.status === 'pinning') this.pinNow();
-    const position = this.state.pin.position ?? this.deps.gps.endTree();
+    if (this.state.pin.adjusting) this.finishAdjustPin();
+    const fallback = this.state.pin.position ? null : this.deps.gps.endTree();
+    const position = this.state.pin.position ?? (fallback ? gpsPosition(fallback) : null);
     const photos = this.state.pendingPhotos;
     const tree = await this.deps.repo.createTree(draft, position);
     let photoErr: string | null = null;

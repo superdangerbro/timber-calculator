@@ -9,6 +9,8 @@ import { isToday } from '../state/repo';
 import { money, safeSummary, safeValue, sawlogM3, scenarioPriced } from '../lib/valuation';
 import { girthText, heightText } from '../lib/units';
 import { PhotoButtons, PhotoThumb, PhotoViewer } from '../components/Photos';
+import { pinOffsetText } from '../lib/geo';
+import { MoveTree } from '../components/MoveTree';
 
 type Product = 'all' | 'pole' | 'sawlog' | 'none';
 
@@ -25,6 +27,7 @@ function TreeEditor({ tree, onClose }: { tree: Tree; onClose: () => void }) {
   const [confirmVoid, setConfirmVoid] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [moving, setMoving] = useState(false);
   const r = useEmitter(repo);
   const live = r.trees.find((t) => t.id === tree.id) ?? tree;
   const units = r.settings.units;
@@ -46,7 +49,17 @@ function TreeEditor({ tree, onClose }: { tree: Tree; onClose: () => void }) {
         <span>{new Date(tree.createdAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}</span>
         <span>±{tree.accuracyM?.toFixed?.(1) ?? '?'} m · {tree.fixCount} fix{tree.fixCount === 1 ? '' : 'es'}</span>
         <span>v{tree.version}</span>
+        {!live.voided && (
+          <button className="btn ghost small" onClick={() => setMoving(true)} data-testid="editor-move-pin">
+            Move pin
+          </button>
+        )}
       </div>
+      {(() => {
+        const m = pinOffsetText(live, units);
+        return m ? <div className="editor-moved" data-testid="editor-moved">Placed by hand, {m}</div> : null;
+      })()}
+      {moving && <MoveTree tree={live} onClose={() => setMoving(false)} />}
       <FieldGrid
         fields={draft}
         onEdit={setEditing}

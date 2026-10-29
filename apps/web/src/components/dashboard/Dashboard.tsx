@@ -283,6 +283,16 @@ function DashboardInner({ me }: { me: Me }) {
   };
 
   // ---------- popup ----------
+  /** "6 m NE from GPS" when the cruiser moved the pin by hand, else null. */
+  const movedText = (t: Tree): string | null => {
+    if (t.positionSource !== 'adjusted' || t.gpsLat == null || t.gpsLon == null) return null;
+    const r = Math.PI / 180;
+    const dx = (t.lon - t.gpsLon) * r * Math.cos(((t.lat + t.gpsLat) / 2) * r) * 6371008.8;
+    const dy = (t.lat - t.gpsLat) * r * 6371008.8;
+    const d = Math.hypot(dx, dy);
+    const dir = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((Math.atan2(dx, dy) / r + 360) % 360) / 45) % 8];
+    return `${d < 10 ? d.toFixed(1) : Math.round(d)} m ${dir} from GPS`;
+  };
   const popupHtml = useCallback((t: Tree) => {
     const v = valuations.get(t.id); const u = userMap.get(t.createdBy);
     const sc = (n?: number) => (n ? String(n) : '–');
@@ -300,6 +310,7 @@ function DashboardInner({ me }: { me: Me }) {
       </div>
       ${t.defects ? `<div class="pop-note">Defects: ${escapeHtml(t.defects)}</div>` : ''}
       ${t.notes ? `<div class="pop-note">${escapeHtml(t.notes)}</div>` : ''}
+      ${movedText(t) ? `<div class="pop-moved" data-testid="pop-moved">Location adjusted by hand (${escapeHtml(movedText(t)!)})</div>` : ''}
       <div class="pop-foot">${escapeHtml(u?.name ?? 'Unknown')} · ${escapeHtml(shortDate(t.createdAt))} · ±${num(t.accuracyM, 1)} m</div>
     </div>`;
   }, [valuations, userMap]);

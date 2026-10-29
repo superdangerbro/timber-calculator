@@ -1,4 +1,4 @@
-import type { AveragedPosition, Tree, TreeEvent, TreeEventType, TreeFields, TreePhoto, TreeStatus } from './types';
+import type { Tree, TreePosition, TreeEvent, TreeEventType, TreeFields, TreePhoto, TreeStatus } from './types';
 import { uuid } from './uuid';
 
 /**
@@ -140,11 +140,15 @@ function applyFields(tree: Tree, fields: unknown) {
 
 function applyPosition(tree: Tree, pos: unknown) {
   if (!pos || typeof pos !== 'object') return;
-  const p = pos as Partial<AveragedPosition>;
+  const p = pos as Partial<TreePosition>;
   if (typeof p.lat === 'number') tree.lat = p.lat;
   if (typeof p.lon === 'number') tree.lon = p.lon;
   if (typeof p.accuracyM === 'number') tree.accuracyM = p.accuracyM;
   if (typeof p.fixCount === 'number') tree.fixCount = p.fixCount;
+  if (p.positionSource === 'gps' || p.positionSource === 'adjusted') tree.positionSource = p.positionSource;
+  if (typeof p.gpsLat === 'number') tree.gpsLat = p.gpsLat;
+  if (typeof p.gpsLon === 'number') tree.gpsLon = p.gpsLon;
+  if (typeof p.gpsAccuracyM === 'number') tree.gpsAccuracyM = p.gpsAccuracyM;
 }
 
 /** Photos are append-only: new ids are added in order, known ids are ignored. */

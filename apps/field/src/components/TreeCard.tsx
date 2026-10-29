@@ -3,9 +3,11 @@ import type { Tree } from '@timber/core';
 import { useApp } from '../app';
 import { useEmitter } from '../lib/emitter';
 import { girthText, heightText } from '../lib/units';
+import { pinOffsetText } from '../lib/geo';
 import { money, safeValue } from '../lib/valuation';
 import { Modal, SpeciesDot, speciesLabel } from './fields';
 import { PhotoButtons, PhotoThumb, PhotoViewer } from './Photos';
+import { MoveTree } from './MoveTree';
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
@@ -19,6 +21,8 @@ export function TreeCard({ tree, onClose }: { tree: Tree; onClose: () => void })
   const v = safeValue(live, repo.scenario);
   const [viewing, setViewing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const moved = pinOffsetText(live, units);
   const mine = live.deviceId === r.settings.deviceId;
   const sc = (n?: number) => (n ? String(n) : '–');
   const photos = live.photos ?? [];
@@ -78,9 +82,23 @@ export function TreeCard({ tree, onClose }: { tree: Tree; onClose: () => void })
         </dd>
         <dt>GPS</dt>
         <dd>
-          ±{Number.isFinite(live.accuracyM) ? live.accuracyM.toFixed(1) : "?"} m · {live.fixCount} {live.fixCount === 1 ? "fix" : "fixes"}
+          ±{Number.isFinite(live.accuracyM) ? live.accuracyM.toFixed(1) : '?'} m · {live.fixCount} {live.fixCount === 1 ? 'fix' : 'fixes'}
         </dd>
+        {moved ? (
+          <>
+            <dt>Location</dt>
+            <dd className="moved" data-testid="card-moved">
+              Placed by hand, {moved}
+            </dd>
+          </>
+        ) : null}
       </dl>
+
+      {!live.voided && (
+        <button className="btn ghost wide" onClick={() => setMoving(true)} data-testid="card-move-pin">
+          Move pin on map
+        </button>
+      )}
 
       {!live.voided &&
         (adding ? (
@@ -91,6 +109,7 @@ export function TreeCard({ tree, onClose }: { tree: Tree; onClose: () => void })
           </button>
         ))}
 
+      {moving && <MoveTree tree={live} onClose={() => setMoving(false)} />}
       {viewing && <PhotoViewer photoId={viewing} onClose={() => setViewing(null)} />}
     </Modal>
   );
