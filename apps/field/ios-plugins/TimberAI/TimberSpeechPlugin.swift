@@ -28,7 +28,10 @@ public class TimberSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
     ]
 
-    private let audioEngine = AVAudioEngine()
+    // Created fresh for every listen, after the audio session is configured. An engine
+    // made earlier caches the old hardware format, and installTap with a mismatched
+    // format raises an Objective-C exception that kills the app outright.
+    private var audioEngine: AVAudioEngine?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var recognizer: SFSpeechRecognizer?
@@ -71,9 +74,14 @@ public class TimberSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
 
             do {
                 let session = AVAudioSession.sharedInstance()
-                try session.setCategory(.playAndRecord, mode: .measurement,
-                                        options: [.duckOthers, .defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP])
+                try session.setCategory(.playAndRecord, mode: .default,
+                                        options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
+                guard session.isInputAvailable else {
+                    self.stopInternal()
+                    call.reject("No microphone available")
+                    return
+                }
 
                 let req = SFSpeechAudioBufferRecognitionRequest()
                 req.shouldReportPartialResults = true
@@ -87,14 +95,20 @@ public class TimberSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.request = req
 
-                let input = self.audioEngine.inputNode
-                let format = input.outputFormat(forBus: 0)
-                input.removeTap(onBus: 0)
+                let engine = AVAudioEngine()
+                let input = engine.inputNode
+                let format = input.inputFormat(forBus: 0)
+                guard format.sampleRate > 0, format.channelCount > 0 else {
+                    self.stopInternal()
+                    call.reject("Microphone is not ready (no input format)")
+                    return
+                }
                 input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                     req.append(buffer)
                 }
-                self.audioEngine.prepare()
-                try self.audioEngine.start()
+                self.audioEngine = engine
+                engine.prepare()
+                try engine.start()
 
                 self.task = recognizer.recognitionTask(with: req) { [weak self] result, error in
                     guard let self = self else { return }
@@ -131,10 +145,11 @@ public class TimberSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func stopInternal() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
+        if let engine = audioEngine {
+            if engine.isRunning { engine.stop() }
+            engine.inputNode.removeTap(onBus: 0)
         }
-        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine = nil
         request?.endAudio()
         task?.cancel()
         request = nil
