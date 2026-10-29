@@ -1,5 +1,5 @@
 'use client';
-import { SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
+import { BEC_ZONES, DEFAULT_BEC_ZONE, DEFAULT_TOP_DIB_CM, SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
 import { money, signed } from '@/lib/format';
 
 export function PricingPanel({
@@ -104,6 +104,18 @@ export function PricingPanel({
             <span>Defect deduction</span>
             <span className="row"><input className="input" type="number" min={0} max={100} value={Math.round(scenario.defectDeduction * 100)}
               onChange={(e) => onChange({ ...scenario, defectDeduction: Math.min(100, n(e.target.value)) / 100 })} aria-label="Defect deduction percent" />&nbsp;%</span>
+          </label>
+          <label className="row between deduct" title="BC Kozak taper equations by biogeoclimatic zone">
+            <span>BEC zone</span>
+            <select className="input" style={{ width: 96 }} value={scenario.becZone ?? DEFAULT_BEC_ZONE} data-testid="bec-zone"
+              onChange={(e) => onChange({ ...scenario, becZone: e.target.value })} aria-label="BEC zone for volume equations">
+              {BEC_ZONES.map((z) => <option key={z} value={z}>{z}</option>)}
+            </select>
+          </label>
+          <label className="row between deduct" title="Inside-bark top diameter that marketable heights are called to">
+            <span>Marketable top</span>
+            <span className="row"><input className="input" type="number" min={5} max={60} value={scenario.topDibCm ?? DEFAULT_TOP_DIB_CM} data-testid="top-dib"
+              onChange={(e) => onChange({ ...scenario, topDibCm: Math.min(60, Math.max(5, n(e.target.value))) })} aria-label="Marketable top diameter in centimetres" />&nbsp;cm</span>
           </label>
         </details>
 
