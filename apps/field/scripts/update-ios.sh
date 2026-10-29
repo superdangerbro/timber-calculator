@@ -8,11 +8,19 @@ PBX=apps/field/ios/App/App.xcodeproj/project.pbxproj
 # Remember the signing Team Xcode saved (free Personal Team id), then drop local iOS edits
 # so the pull never conflicts.
 TEAM=$(grep -m1 -o 'DEVELOPMENT_TEAM = [A-Z0-9]*;' "$PBX" | sed 's/DEVELOPMENT_TEAM = //; s/;//' || true)
-git checkout HEAD -- apps/field/ios
-git pull --ff-only
+BRANCH=claude/project-thread-jnehgx
+git fetch origin "$BRANCH"
+# Match the published code exactly (local edits are only generated/signing files).
+git checkout -q "$BRANCH" 2>/dev/null || git checkout -q -b "$BRANCH" "origin/$BRANCH"
+git reset --hard "origin/$BRANCH"
+echo "Code version: $(git log --oneline -1)"
 
 pnpm install
 pnpm --filter @timber/field build
+if ! grep -q "Press New tree" apps/field/dist/assets/*.js; then
+  echo "Build check failed: the new screens are not in the bundle. Stop and send this output." >&2
+  exit 1
+fi
 (cd apps/field && npx cap sync ios)
 
 if [ -n "${TEAM:-}" ]; then
