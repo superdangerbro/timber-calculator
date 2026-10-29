@@ -66,9 +66,9 @@ npx cap open ios                           # opens ios/App/App.xcworkspace in Xc
    creates a free "Personal Team" for it.
 2. Select the **App** target > **Signing & Capabilities**. Tick **Automatically manage
    signing** and pick **Team: <your name> (Personal Team)**.
-3. Free teams need a bundle id nobody else has used. If Xcode complains, change
-   `ca.humanesolutions.timber` to something like `ca.humanesolutions.timber.joe`.
-   (The app uses no capabilities that a free account can't sign.)
+3. The bundle id is `ca.humanesolutions.timber.joe`. Free teams need one nobody else has
+   used; if Xcode complains, add another suffix. (The app uses no capabilities that a free
+   account can't sign.)
 4. Plug in the iPhone, unlock it and tap **Trust** on the phone. Turn on **Developer Mode**
    (Settings > Privacy & Security > Developer Mode, then restart the phone).
 5. Pick the phone as the run destination at the top of Xcode and press **Run** (Cmd-R).
@@ -89,13 +89,14 @@ npx cap open ios                           # opens ios/App/App.xcworkspace in Xc
 
 ### Updating the app
 
+Quit Xcode, then run:
+
 ```bash
-git pull
-pnpm install
-pnpm --filter @timber/field build && cd apps/field && npx cap sync ios
+~/timber-calculator/apps/field/scripts/update-ios.sh
 ```
 
-Then plug in the phone and press Run in Xcode.
+It pulls the latest code, rebuilds, syncs the iOS project and keeps your signing Team, then
+opens Xcode. Plug in the phone and press Run.
 
 ### Before going to the bush
 
