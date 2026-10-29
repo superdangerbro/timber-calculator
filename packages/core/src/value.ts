@@ -30,6 +30,8 @@ export const DEFAULT_SCENARIO: Scenario = {
       { name: 'Class 4', minDbhCm: 23, minLengthM: 12 },
     ],
   },
+  becZone: 'ICH',
+  topDibCm: 15,
   defectDeduction: 0.15,
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -53,7 +55,11 @@ export function valueTree(tree: ValuableTree, scenario: Scenario = DEFAULT_SCENA
   if (tree.voided || tree.leaveTree) return none;
   if (!tree.species || !tree.dbhCm || !tree.heightM) return none;
 
-  const gross = treeVolumeM3(tree.species, tree.dbhCm, tree.heightM, scenario.volumeCoefficients);
+  const gross = treeVolumeM3(tree.species, tree.dbhCm, tree.heightM, {
+    coefficients: scenario.volumeCoefficients,
+    becZone: scenario.becZone,
+    topDibCm: scenario.topDibCm,
+  });
   const deduct = tree.defects && tree.defects.trim() ? Math.min(Math.max(scenario.defectDeduction, 0), 1) : 0;
   const net = gross * (1 - deduct);
   const sawlogValue = net * (scenario.sawlogPricePerM3[tree.species] ?? 0);

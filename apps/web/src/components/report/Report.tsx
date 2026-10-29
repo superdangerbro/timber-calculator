@@ -169,7 +169,7 @@ export function Report({ me }: { me: { name: string } }) {
         <p className="rep-small">
           Sawlog $/m³: {Object.entries(state.scenario.sawlogPricePerM3).map(([k, v]) => `${k} ${v}`).join(' · ')}.{' '}
           Poles: {state.scenario.poleSpec.classes.map((c) => { const p = state.scenario.polePrices[c.name]; return p ? `${c.name} $${p.perPiece} + $${p.perMetre}/m` : c.name; }).join(' · ')}.{' '}
-          Pole spec: {state.scenario.poleSpec.species.join('/')} ≥ {state.scenario.poleSpec.minLengthM} m, straightness ≥ {state.scenario.poleSpec.minStraightness}, twist ≥ {state.scenario.poleSpec.minTwist}, branchiness ≥ {state.scenario.poleSpec.minBranchiness}. Defect deduction {Math.round(state.scenario.defectDeduction * 100)}%.
+          Pole spec: {state.scenario.poleSpec.species.join('/')} ≥ {state.scenario.poleSpec.minLengthM} m, straightness ≥ {state.scenario.poleSpec.minStraightness}, twist ≥ {state.scenario.poleSpec.minTwist}, branchiness ≥ {state.scenario.poleSpec.minBranchiness}. Defect deduction {Math.round(state.scenario.defectDeduction * 100)}%. Volume: BC Kozak taper equations, {state.scenario.becZone ?? 'ICH'} zone, to a {state.scenario.topDibCm ?? 15} cm top.
         </p>
         <p className="rep-small">Filters: {activeFilterCount(state.filters) ? fdesc.join(' · ') : 'none (all live trees)'}. Volumes use placeholder Schumacher-Hall coefficients pending BC taper equations.</p>
       </section>
