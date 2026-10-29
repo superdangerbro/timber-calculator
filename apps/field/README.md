@@ -44,14 +44,15 @@ Environment variables (optional, in `apps/field/.env`):
 - `VITE_SERVER_URL`: the default server. It can also be changed in Settings.
 - `VITE_MAPBOX_TOKEN`: if set, uses Mapbox satellite imagery. Without it, the app uses Esri World Imagery.
 
-## Build to Joe's iPhone
+## Build to Joe's iPhone (free Apple ID, Xcode, cable)
 
-You need a Mac with **Xcode 26** (for Apple Intelligence; Xcode 16 also builds, but without
-the AI fallback), CocoaPods (`brew install cocoapods`), Node 20+ and pnpm, plus an Apple
-Developer account ($99 a year) for TestFlight.
+This path needs no paid Apple Developer account and no TestFlight. You need a Mac with
+**Xcode 26** (for Apple Intelligence; Xcode 16 also builds, but without the AI fallback),
+CocoaPods (`brew install cocoapods`), Node 20+ and pnpm, a Lightning/USB-C cable, and your
+normal Apple ID.
 
 ```bash
-git clone <repo> && cd timber-calculator
+git clone https://github.com/superdangerbro/timber-calculator.git && cd timber-calculator
 pnpm install
 pnpm --filter @timber/field build          # web bundle -> apps/field/dist
 cd apps/field
@@ -59,24 +60,42 @@ npx cap sync ios                           # copies dist into ios/ and runs pod 
 npx cap open ios                           # opens ios/App/App.xcworkspace in Xcode
 ```
 
-### Run on the phone over a cable (quickest)
+### One-time setup
 
-1. In Xcode, select the **App** target, open **Signing & Capabilities**, choose your Team and
-   keep the bundle id `ca.humanesolutions.timber`, or make it unique.
-2. Plug in the iPhone, trust the Mac, and turn on **Developer Mode** on the phone
-   (Settings > Privacy & Security). Pick the phone as the run destination and press Run (Cmd-R).
-3. On first launch, allow Microphone, Speech Recognition, Location (While Using) and Motion.
+1. Xcode > **Settings > Accounts**, press **+**, and sign in with your Apple ID. Xcode
+   creates a free "Personal Team" for it.
+2. Select the **App** target > **Signing & Capabilities**. Tick **Automatically manage
+   signing** and pick **Team: <your name> (Personal Team)**.
+3. Free teams need a bundle id nobody else has used. If Xcode complains, change
+   `ca.humanesolutions.timber` to something like `ca.humanesolutions.timber.joe`.
+   (The app uses no capabilities that a free account can't sign.)
+4. Plug in the iPhone, unlock it and tap **Trust** on the phone. Turn on **Developer Mode**
+   (Settings > Privacy & Security > Developer Mode, then restart the phone).
+5. Pick the phone as the run destination at the top of Xcode and press **Run** (Cmd-R).
+6. The first launch is blocked until you trust yourself on the phone: Settings > General >
+   **VPN & Device Management** > your Apple ID > **Trust**. Then open the app again.
+7. Allow Microphone, Speech Recognition, Location (While Using) and Motion when asked.
    The clinometer screen has an "Enable tilt sensor" button if iOS has not asked yet.
 
-### TestFlight (installs without a cable, and updates)
+### Limits of a free Apple ID
 
-1. In App Store Connect, create the app with the same bundle id.
-2. In Xcode, set the run destination to **Any iOS Device (arm64)**, choose **Product > Archive**,
-   then **Distribute App > App Store Connect > Upload**.
-3. In App Store Connect > TestFlight, add Joe as an internal tester. He installs the
-   **TestFlight** app and accepts the invite.
-4. For each update, run `pnpm --filter @timber/field build && npx cap sync ios`,
-   increase the Build number in Xcode, and archive again.
+- **The app stops opening after 7 days.** Plug the phone in and press Run in Xcode again
+  to re-sign it for another 7 days. Your trees are kept: re-installing over the top does not
+  touch the app's data. (Deleting the app from the phone *does* erase unsynced trees, so sync
+  first.) Re-sign before a long trip to the bush so it doesn't expire mid-cruise.
+- At most 3 free-signed apps on the phone at once, and 10 new app ids a week.
+- Upgrading later to a paid account ($99/yr) gives 1-year installs and TestFlight with no
+  code changes; only the Team in step 2 changes.
+
+### Updating the app
+
+```bash
+git pull
+pnpm install
+pnpm --filter @timber/field build && cd apps/field && npx cap sync ios
+```
+
+Then plug in the phone and press Run in Xcode.
 
 ### Before going to the bush
 

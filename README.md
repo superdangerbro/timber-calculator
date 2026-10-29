@@ -44,7 +44,8 @@ node e2e/sync-integration.mjs                    # phone -> server -> dashboard 
 - **Database:** create a Neon project, then run `DATABASE_URL=... pnpm --filter @timber/web db:migrate`.
 - **Web:** import the repo into Vercel with root directory `apps/web`. Set `DATABASE_URL`,
   `AUTH_SECRET` (32+ random characters) and optionally `NEXT_PUBLIC_MAPBOX_TOKEN`.
-- **iPhone:** build on a Mac with Xcode and ship through TestFlight; see
+- **iPhone:** build on a Mac with Xcode and install over a cable with a free Apple ID
+  (re-run from Xcode every 7 days); see
   [`apps/field/README.md`](apps/field/README.md).
 
 ## How the data works
