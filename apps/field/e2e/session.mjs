@@ -64,9 +64,43 @@ const say = async (text) => {
   await tid('type-input').press('Enter');
   await page.waitForTimeout(150);
 };
-const phase = () => page.locator('.tally').getAttribute('data-phase');
-const waitPhase = async (p) => page.waitForFunction((p) => document.querySelector('.tally')?.getAttribute('data-phase') === p, p, { timeout: 8000 });
+const waitStep = async (p) => page.waitForFunction((p) => document.querySelector('.tally')?.getAttribute('data-step') === p, p, { timeout: 8000 });
 const lastTag = async () => (await tid('tag-big').textContent())?.trim();
+const num = async (id, v) => {
+  await tid(id).fill(String(v));
+  await tid(id).press('Enter');
+};
+/** Fill the Measure form by tapping, like a glove would. */
+const fillTree = async ({ sp, circ, dbh, height, s, t, b, defects = [], other, leave }) => {
+  if (sp) await tid(`sp-chip-${sp}`).click();
+  if (circ !== undefined) await num('input-circ', circ);
+  if (dbh !== undefined) await num('input-dbh', dbh);
+  if (height !== undefined) await num('input-height', height);
+  if (s) await tid(`seg-straightness-${s}`).click();
+  if (t) await tid(`seg-twist-${t}`).click();
+  if (b) await tid(`seg-branchiness-${b}`).click();
+  for (const d of defects) await tid(`defect-${d}`).click();
+  if (other) await num('defect-other', other);
+  if (leave) await tid('leave-toggle').click();
+};
+const startTree = async () => {
+  await tid('new-tree').click();
+  await waitStep('measure');
+  await tid('pinbar').waitFor();
+};
+const pinNow = async () => {
+  await page.waitForFunction(() => !document.querySelector('[data-testid=pin-now]')?.disabled || document.querySelector('[data-testid=re-pin]'), null, { timeout: 8000 });
+  if (await tid('pin-now').count()) await tid('pin-now').click();
+  await tid('re-pin').waitFor();
+};
+/** Measure -> Photo (skipped) -> Get tag. */
+const tagIt = async () => {
+  await tid('next-photo').click();
+  await waitStep('photo');
+  await tid('get-tag').click();
+  await waitStep('saved');
+  return lastTag();
+};
 let walk = 0;
 const moveTo = async (dNorthM, dEastM) => {
   walk++;
@@ -74,19 +108,30 @@ const moveTo = async (dNorthM, dEastM) => {
   const lon = START.longitude + dEastM / (111320 * Math.cos((START.latitude * Math.PI) / 180));
   await context.setGeolocation({ latitude: lat, longitude: lon, accuracy: 3 + (walk % 4) });
 };
+const makeJpeg = async (path, label) => {
+  const b64 = await page.evaluate((label) => {
+    const c = document.createElement('canvas');
+    c.width = 2400; c.height = 1800;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 1800);
+    grad.addColorStop(0, '#9cc7e8'); grad.addColorStop(1, '#2f5d3a');
+    g.fillStyle = grad; g.fillRect(0, 0, 2400, 1800);
+    g.fillStyle = '#5b3b22'; g.fillRect(1050, 300, 300, 1500);
+    g.fillStyle = '#ff6b1a'; g.fillRect(1030, 1000, 340, 70);
+    g.fillStyle = '#fff'; g.font = 'bold 54px sans-serif'; g.fillText(label, 1110, 1052);
+    for (let i = 0; i < 4000; i++) { g.fillStyle = `hsl(${100 + (i % 40)},40%,${15 + (i % 30)}%)`; g.fillRect((i * 97) % 2400, (i * 53) % 900, 6, 6); }
+    return c.toDataURL('image/jpeg', 0.95).split(',')[1];
+  }, label);
+  writeFileSync(path, Buffer.from(b64, 'base64'));
+};
 
 try {
-  // ---------------------------------------------------------------- boot
+  // ---------------------------------------------------------------- boot (Joe's defaults: imperial, circumference)
   await page.goto(`${BASE}?speech=text&tts=silent&notch=1`);
-  await tid('talk').waitFor();
-  // The first part of the session talks metric diameters; Joe's imperial
-  // circumference setup is exercised at the end.
-  await tid('tab-settings').click();
-  await tid('units-metric').click();
-  await tid('measure-dbh').click();
-  await tid('tab-tally').click();
+  await tid('new-tree').waitFor();
   await page.waitForTimeout(1500);
-  log('Tally home, empty');
+  assert((await tid('listening').count()) === 0, 'nothing listens on launch');
+  log('Tally home, empty, mic off');
   await shot('01-tally-empty');
 
   // ---------------------------------------------------------------- block boundary
@@ -98,50 +143,78 @@ try {
   await tid('tab-tally').click();
   await page.waitForTimeout(800);
 
-  // ---------------------------------------------------------------- tree 1: casual sentence
+  // ---------------------------------------------------------------- tree 1: every step by buttons, with a photo
   await moveTo(10, 5);
-  await tid('talk').click();
-  await waitPhase('listening');
-  log('Talk pressed -> listening');
-  await shot('03-listening');
-  await say('big fir forty two about thirty metres straight four no twist clean');
-  await waitPhase('readback');
-  const spoken1 = await tid('spoken').textContent();
-  assert(/Douglas-fir/i.test(spoken1), `readback mentions species: ${spoken1}`);
-  log('Readback:', spoken1);
-  await shot('04-readback-full-draft');
-  await say('save');
-  await waitPhase('saved');
+  await startTree();
+  log('New tree -> pinning');
+  await shot('03-pinning');
+  await tid('re-pin').waitFor({ timeout: 12000 }); // auto-pins after averaging
+  const acc = await tid('pin-accuracy').textContent();
+  assert(/fix/.test(acc), `pin shows accuracy and fixes: ${acc}`);
+  log('Pinned:', acc);
+  await fillTree({ sp: 'FD', circ: 52, height: 98, s: 4, t: 5, b: 5 });
+  const derived = await tid('derived-dbh').textContent();
+  assert(/DBH 16\.5 in/.test(derived), `DBH derived from circumference: ${derived}`);
+  log('Form filled, derived', derived.split('(')[0].trim());
+  await shot('04-form-filled');
+  await tid('next-photo').click();
+  await waitStep('photo');
+  await shot('05-photo-step');
+  const jpeg1 = join(SHOTS, 'tree1.jpg');
+  await makeJpeg(jpeg1, 'J-0001');
+  const [ch1] = await Promise.all([page.waitForEvent('filechooser'), tid('photo-library').click()]);
+  await ch1.setFiles(jpeg1);
+  await tid('pending-photo').waitFor({ timeout: 15000 });
+  await shot('06-photo-added');
+  await tid('get-tag').click();
+  await waitStep('saved');
   assert((await lastTag()) === 'J-0001', 'first tag J-0001');
-  log('Saved J-0001');
-  await shot('05-saved-tag-J-0001');
+  assert(/Write this on the tape/.test(await tid('last-tag').textContent()), 'tag hero caption');
+  assert(/Photo \(1\)/.test(await tid('saved-photo').textContent()), 'photo saved with the tree');
+  log('Saved J-0001 with 1 photo');
+  await shot('07-saved-tag-J-0001');
 
-  // ---------------------------------------------------------------- tree 2: zero taps, straight after save
+  // ---------------------------------------------------------------- tree 2: missing fields -> confirm -> fill in
   await moveTo(28, -12);
-  await say('cedar fifty five twenty eight metres straight three twist four branchy two some sweep');
-  await waitPhase('readback');
-  await say('save');
-  await waitPhase('saved');
-  assert((await lastTag()) === 'J-0002', 'second tag');
-  log('Saved J-0002 (no taps)');
+  await startTree();
+  await pinNow();
+  await fillTree({ sp: 'CW', circ: 68, height: 92, s: 3, defects: ['sweep'] });
+  await tid('next-photo').click();
+  await tid('get-tag').click();
+  await tid('confirm-missing').waitFor();
+  const conf = await tid('confirm-missing').textContent();
+  assert(/twist, branchiness/.test(conf), `confirm lists missing: ${conf}`);
+  log('Confirm:', conf.replace(/\s+/g, ' ').slice(0, 60));
+  await shot('08-confirm-missing');
+  await tid('confirm-back').click();
+  await waitStep('measure');
+  assert((await tid('confirm-missing').count()) === 0, 'confirm closes');
+  await shot('09-missing-highlighted');
+  await fillTree({ t: 4, b: 2 });
+  assert((await tagIt()) === 'J-0002', 'second tag');
+  log('Saved J-0002');
 
-  // ---------------------------------------------------------------- tree 3: missing fields + correction
+  // ---------------------------------------------------------------- metric + DBH from here (Settings)
+  await tid('tab-settings').click();
+  await tid('units-metric').click();
+  await tid('measure-dbh').click();
+  await tid('tab-tally').click();
+
+  // tree 3: DBH form, switch to circumference, tag anyway with a gap
   await moveTo(40, 22);
-  await tid('talk').click();
-  await say('lodgepole thirty');
-  await waitPhase('readback');
-  const spoken3 = await tid('spoken').textContent();
-  assert(/missing/i.test(spoken3), `readback lists missing: ${spoken3}`);
-  log('Readback with missing:', spoken3);
-  await shot('06-readback-missing');
-  await say('twenty four metres straight five twist five branchy four');
-  await say('no, thirty two');
-  await page.waitForFunction(() => document.querySelector('[data-testid="field-dbhCm"]')?.textContent?.includes('32'));
-  log('Correction applied: DBH 32');
-  await shot('07-correction-dbh-32');
-  await say('save');
-  await waitPhase('saved');
-  assert((await lastTag()) === 'J-0003', 'third tag');
+  await startTree();
+  await pinNow();
+  await fillTree({ sp: 'PL', dbh: 30, height: 24, s: 5, t: 5 });
+  await tid('girth-mode').click();
+  await num('input-circ', 100.5);
+  assert(/DBH 32 cm/.test(await tid('derived-dbh').textContent()), 'metric circumference -> DBH 32');
+  await shot('10-form-metric-circ');
+  await tid('next-photo').click();
+  await tid('get-tag').click();
+  await tid('confirm-tag').click();
+  await waitStep('saved');
+  assert((await lastTag()) === 'J-0003', 'third tag (tagged anyway)');
+  log('Saved J-0003 with branchiness missing');
 
   // ---------------------------------------------------------------- offline from here on
   await context.setOffline(true);
@@ -149,45 +222,40 @@ try {
 
   // tree 4 then undo
   await moveTo(55, -30);
-  await say('larch thirty eight twenty six metres straight four twist four branchy three');
-  await say('save');
-  await waitPhase('saved');
-  assert((await lastTag()) === 'J-0004', 'fourth tag');
-  await say('undo');
+  await startTree();
+  await fillTree({ sp: 'LW', dbh: 38, height: 26, s: 4, t: 4, b: 3 });
+  assert((await tagIt()) === 'J-0004', 'fourth tag');
+  await tid('undo').click();
   await page.waitForFunction(() => /Voided J-0004/.test(document.querySelector('[data-testid="notice"]')?.textContent ?? ''));
   log('Undo voided J-0004');
-  await shot('08-undo-voided');
+  await shot('11-undo-voided');
 
   // tree 5: re-tally, number 4 is never reused
-  await say('larch thirty eight twenty six metres straight four twist four branchy three');
-  await say('save');
-  await waitPhase('saved');
-  assert((await lastTag()) === 'J-0005', 'J-0004 not reused');
-  await say('repeat');
-  assert(/zero zero zero five/i.test(await tid('spoken').textContent()), 'repeat speaks tag');
-  log('Saved J-0005, repeat ok (offline)');
-  await shot('09-offline-saved-J-0005');
+  await startTree();
+  await fillTree({ sp: 'LW', dbh: 38, height: 26, s: 4, t: 4, b: 3 });
+  assert((await tagIt()) === 'J-0005', 'J-0004 not reused');
+  await tid('repeat').click();
+  log('Saved J-0005 (offline)');
+  await shot('12-offline-saved-J-0005');
 
   // leave tree
   await moveTo(70, 8);
-  await say('leave tree big fir seventy two');
-  await say('save');
-  await waitPhase('saved');
-  assert((await lastTag()) === 'J-L0001', 'leave series');
+  await startTree();
+  await fillTree({ sp: 'FD', dbh: 72, leave: true });
+  assert((await tagIt()) === 'J-L0001', 'leave series');
   log('Leave tree J-L0001');
-  await shot('10-leave-tree');
+  await shot('13-leave-tree');
 
   // ---------------------------------------------------------------- tree 6 via Bluetooth clicker + clinometer
   await moveTo(85, -18);
-  await page.locator('body').click({ position: { x: 5, y: 500 } }).catch(() => {});
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
-  await page.keyboard.press('Space'); // clicker: saved -> next tree
-  await waitPhase('listening');
-  await say('spruce thirty six straight four twist four branchy three');
-  await say('measure height');
+  await page.keyboard.press('Space'); // clicker: saved -> new tree
+  await waitStep('measure');
+  await fillTree({ sp: 'SX', dbh: 36, s: 4, t: 4, b: 3 });
+  await tid('open-measure').click();
   await tid('measure').waitFor();
   log('Clinometer open');
-  await shot('11-measure-base');
+  await shot('14-measure-base');
   await tid('distance').fill('20');
   const setPitch = async (v) =>
     tid('pitch-slider').evaluate((el, v) => {
@@ -198,34 +266,36 @@ try {
   await setPitch(-4);
   await tid('mark').click();
   await setPitch(52);
-  await shot('12-measure-top');
   await tid('mark').click();
   const h = (await tid('height-result').textContent()).trim();
   log('Clinometer height', h);
   assert(/^2[67]\.\d m$/.test(h), `height from angles ${h}`); // 20*(tan52 - tan(-4)) = 27.0
-  await shot('13-measure-result');
+  await shot('15-measure-result');
   await tid('mark').click(); // "Use"
   await tid('measure').waitFor({ state: 'detached' });
-  await page.waitForFunction(() => document.querySelector('[data-testid="field-heightM"]')?.textContent?.includes('clino'));
-  await shot('14-height-filled');
+  assert(/^2[67]/.test(await tid('input-height').inputValue()), 'height filled from clinometer');
+  await shot('16-height-filled');
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
-  await page.keyboard.press('Enter'); // clicker in readback = save
-  await waitPhase('saved');
-  assert((await lastTag()) === 'J-0006', 'clicker save J-0006');
-  log('Clicker saved J-0006');
-  await shot('15-tally-after-six');
+  await page.keyboard.press('Enter'); // clicker: measure -> photo
+  await waitStep('photo');
+  await page.keyboard.press('Enter'); // clicker: photo -> tag
+  await waitStep('saved');
+  assert((await lastTag()) === 'J-0006', 'clicker tag J-0006');
+  assert((await tid('listening').count()) === 0, 'clicker never starts the mic');
+  log('Clicker tagged J-0006');
+  await shot('17-tally-after-six');
 
   // ---------------------------------------------------------------- tree list + edit
   await tid('tab-trees').click();
   await tid('tree-list').waitFor();
   log('Trees list');
-  await shot('16-trees-list');
+  await shot('20-trees-list');
   await tid('row-J-0002').click();
   await tid('tree-editor').waitFor();
   await tid('field-dbhCm').click();
   await tid('input-dbhCm').fill('57');
   await tid('input-dbhCm').press('Enter');
-  await shot('17-tree-editor');
+  await shot('21-tree-editor');
   await tid('save-edit').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="row-J-0002"]')?.textContent?.includes('57 cm'));
   log('Edited J-0002 DBH -> 57 (update event)');
@@ -238,11 +308,11 @@ try {
   await page.locator('.void-toggle input').check();
   await tid('sp-FD').click();
   log('Filtered FD incl. voids');
-  await shot('18-trees-filter-fd');
+  await shot('22-trees-filter-fd');
   await page.locator('.void-toggle input').uncheck();
   await page.locator('.fchip').first().click();
   await tid('prod-pole').click();
-  await shot('19-trees-filter-poles');
+  await shot('23-trees-filter-poles');
   await tid('prod-all').click();
 
   // ---------------------------------------------------------------- audit
@@ -251,7 +321,7 @@ try {
   await tid('audit-card').waitFor();
   await page.waitForTimeout(800);
   log('Audit, nearest first:', await tid('audit-tag').textContent());
-  await shot('20-audit');
+  await shot('24-audit');
   const target = (await tid('audit-tag').textContent()).trim();
   await tid('audit-type').fill('cut stump forty');
   await tid('audit-type').press('Enter');
@@ -261,12 +331,12 @@ try {
   await tid('audit-next').click();
   await tid('status-damaged').click();
   log('Audit:', flash);
-  await shot('21-audit-status');
+  await shot('25-audit-status');
 
   // ---------------------------------------------------------------- settings + export
   await tid('tab-settings').click();
   await tid('settings-screen').waitFor();
-  await shot('22-settings');
+  await shot('26-settings');
   const [download] = await Promise.all([page.waitForEvent('download'), tid('export-csv').click()]);
   const csvPath = join(SHOTS, 'export.csv');
   await download.saveAs(csvPath);
@@ -274,7 +344,7 @@ try {
   assert(csv.includes('J-0001') && csv.includes('J-0006') && !csv.includes('J-0004'), 'CSV has live trees only');
   log(`CSV export ${csv.split('\n').length - 1} rows`);
   await page.locator('.page').evaluate((el) => el.scrollTo(0, el.scrollHeight));
-  await shot('23-settings-export');
+  await shot('27-settings-export');
 
   // ---------------------------------------------------------------- back online: offline map download
   await context.setOffline(false);
@@ -308,21 +378,21 @@ try {
   await tid('download-CB12').click();
   await tid('region-CB12').waitFor({ timeout: 60000 });
   log('Offline map:', await tid('region-CB12').textContent());
-  await shot('24-maps-downloaded');
+  await shot('28-maps-downloaded');
   serveTiles = false; // from now on tiles can only come from local storage
 
   // ---------------------------------------------------------------- reload: data persisted
   await page.reload();
-  await tid('talk').waitFor();
+  await tid('new-tree').waitFor();
   await page.waitForTimeout(2500);
   assert((await lastTag()) === 'J-0006', 'last tag shown after reload');
-  await shot('25-tally-after-reload');
+  await shot('29-tally-after-reload');
   await tid('tab-trees').click();
   await tid('when-all').click();
   const rows = await page.locator('.tree-row').count();
   assert(rows === 5, `5 live trees after reload, got ${rows}`); // J-0001,2,5,6 + J-L0001
   log(`Reload: ${rows} live trees persisted`);
-  await shot('26-trees-after-reload');
+  await shot('30-trees-after-reload');
   await tid('tab-settings').click();
   assert((await tid('next-tag').textContent()).trim() === 'J-0007', 'next tag survives reload');
 
@@ -330,13 +400,12 @@ try {
   await context.setOffline(true);
   await tid('tab-tally').click();
   await moveTo(100, 30);
-  await tid('talk').click();
-  await say('douglas fir forty five thirty two metres straight five twist five branchy four');
-  await say('save');
-  await waitPhase('saved');
+  await startTree();
+  await fillTree({ sp: 'FD', dbh: 45, height: 32, s: 5, t: 5, b: 4 });
+  await tagIt();
   assert((await lastTag()) === 'J-0007', 'offline after reload J-0007');
   log('Offline tally after reload -> J-0007');
-  await shot('27-offline-after-reload');
+  await shot('31-offline-after-reload');
   await context.setOffline(false);
 
   // simulated GPS toggle
@@ -345,7 +414,7 @@ try {
   await page.waitForTimeout(1500);
   await tid('tab-tally').click();
   await page.waitForTimeout(1200);
-  await shot('28-simulated-gps');
+  await shot('32-simulated-gps');
   await tid('tab-settings').click();
   await tid('sim-gps').click();
 
@@ -363,17 +432,33 @@ try {
   await tid('tab-tally').click();
   await page.waitForTimeout(600);
   await moveTo(60, -40);
-  await tid('talk').click();
+  // One tree by voice (typed fallback stands in for the microphone).
+  await tid('mic').click();
+  await tid('listening').waitFor();
+  await tid('voice-stop').waitFor();
+  log('Voice on: listening, Stop visible');
+  await shot2('field-00-voice-listening');
+  await tid('voice-stop').click();
+  await tid('listening').waitFor({ state: 'detached' });
+  assert(await tid('new-tree').isVisible(), 'Stop goes back to the buttons');
+  log('Stop -> back to buttons');
+  await tid('mic').click();
+  await tid('listening').waitFor();
+  await say('new tree');
+  await waitStep('measure');
   await say('fir circumference seventy five inches ninety eight feet straight four no twist clean');
-  await waitPhase('readback');
+  await page.waitForFunction(() => /^Douglas-fir/.test(document.querySelector('[data-testid=spoken]')?.textContent ?? ''), null, { timeout: 8000 });
   const rb = (await tid('spoken').textContent()).trim();
   assert(rb === 'Douglas-fir, circumference 75 inches, DBH 23.9 inches, 98 feet, straightness 4, twist 5, branchiness 5.', `imperial readback: ${rb}`);
+  assert((await tid('input-circ').inputValue()) === '75', 'voice filled the form');
   log('Imperial readback:', rb);
   await shot2('field-01-readback-circumference');
   await say('save');
-  await waitPhase('saved');
+  await waitStep('saved');
   const circTag = await lastTag();
   assert(circTag === 'J-0008', `circumference tree tag ${circTag}`);
+  await tid('mic').click(); // voice off
+  await tid('listening').waitFor({ state: 'detached' });
   // Stored metric: 75 in = 190.5 cm circumference, DBH = C / pi = 60.6 cm, 98 ft = 29.9 m.
   const stored = await page.evaluate(() => new Promise((res, rej) => {
     const r = indexedDB.open('timber-field');
@@ -390,20 +475,7 @@ try {
 
   // Photo: a big test JPEG (exercises the on-device shrink to <= 1280 px).
   const jpegPath = join(V2, 'test-photo.jpg');
-  const jpegB64 = await page.evaluate(() => {
-    const c = document.createElement('canvas');
-    c.width = 2400; c.height = 1800;
-    const g = c.getContext('2d');
-    const grad = g.createLinearGradient(0, 0, 0, 1800);
-    grad.addColorStop(0, '#9cc7e8'); grad.addColorStop(1, '#2f5d3a');
-    g.fillStyle = grad; g.fillRect(0, 0, 2400, 1800);
-    g.fillStyle = '#5b3b22'; g.fillRect(1050, 300, 300, 1500);
-    g.fillStyle = '#ff6b1a'; g.fillRect(1030, 1000, 340, 70);
-    g.fillStyle = '#fff'; g.font = 'bold 54px sans-serif'; g.fillText('J-0008', 1110, 1052);
-    for (let i = 0; i < 4000; i++) { g.fillStyle = `hsl(${100 + (i % 40)},40%,${15 + (i % 30)}%)`; g.fillRect((i * 97) % 2400, (i * 53) % 900, 6, 6); }
-    return c.toDataURL('image/jpeg', 0.95).split(',')[1];
-  });
-  writeFileSync(jpegPath, Buffer.from(jpegB64, 'base64'));
+  await makeJpeg(jpegPath, 'J-0008');
   await tid('saved-photo').click();
   await tid('photo-sheet').waitFor();
   await shot2('field-03-photo-sheet');

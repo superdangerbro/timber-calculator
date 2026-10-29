@@ -35,7 +35,8 @@ describe('display units', () => {
 describe('tally with circumference in imperial', () => {
   it('stores metric, reads back in inches and feet', async () => {
     const { tally, tts, repo } = await makeRig({ imperial: true });
-    await tally.press();
+    tally.newTree();
+    await tally.toggleVoice();
     await tally.hear('fir circumference seventy five inches ninety eight feet straight four no twist clean');
     const d = tally.getState().draft;
     expect(d).toMatchObject({ species: 'FD', circumferenceCm: 190.5, dbhCm: 60.6, heightM: 29.9 });
@@ -47,7 +48,7 @@ describe('tally with circumference in imperial', () => {
   });
   it('bare numbers are circumference inches then feet', async () => {
     const { tally } = await makeRig({ imperial: true });
-    await tally.press();
+    tally.newTree();
     await tally.hear('fir seventy five ninety eight');
     expect(tally.getState().draft).toMatchObject({ circumferenceCm: 190.5, heightM: 29.9 });
     await tally.hear('no, seventy eight inches');
@@ -55,9 +56,10 @@ describe('tally with circumference in imperial', () => {
   });
   it('"photo" asks for a photo of the last saved tree', async () => {
     const { tally } = await makeRig({ imperial: true });
-    await tally.press();
+    tally.newTree();
     await tally.hear('fir circ 75 98 feet straight 4 twist 4 clean');
     await tally.hear('save');
+    expect(tally.getState().step).toBe('saved');
     await tally.hear('take a photo');
     expect(tally.getState().photoRequest?.tag).toBe('J-0001');
     await tally.photoDone(false);

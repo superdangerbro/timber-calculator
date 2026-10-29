@@ -1,110 +1,136 @@
 import { describe, expect, it, vi } from 'vitest';
 import { tagSpeech, verifyChain } from '@timber/core';
+import { TextSpeech } from '../src/platform/speech';
+import type { SpeechKind } from '../src/platform/types';
 import { makeRig } from './helpers';
 
 const SENTENCE = 'big fir forty two about thirty metres straight four no twist clean';
+const FULL = { species: 'FD' as const, dbhCm: 42, heightM: 30, straightness: 4 as const, twist: 5 as const, branchiness: 5 as const };
 
-describe('tally state machine', () => {
-  it('listen -> parse -> readback -> save -> tag', async () => {
+/** A "real" microphone engine for timeout tests: never hears anything unless told to. */
+class FakeMic extends TextSpeech {
+  readonly kind: SpeechKind = 'native';
+  partial(t: string) {
+    this.handlers?.onPartial?.(t);
+  }
+  fail(m: string) {
+    this.handlers?.onError?.(m);
+  }
+}
+
+describe('tally: buttons only', () => {
+  it('new tree -> pin -> form -> photo -> tag', async () => {
     const { tally, tts, repo, fix } = await makeRig();
-    await tally.press(); // Talk / clicker
-    expect(tally.getState().phase).toBe('listening');
+    expect(tally.getState().step).toBe('idle');
+    tally.newTree();
+    expect(tally.getState()).toMatchObject({ step: 'measure', pin: { status: 'pinning' } });
     fix(50.7001, -120.3501, 4);
     fix(50.7002, -120.3502, 6);
+    tally.pinNow();
+    const pin = tally.getState().pin;
+    expect(pin.status).toBe('pinned');
+    expect(pin.position?.fixCount).toBe(2);
+    // Fixes after the pin do not move the tree.
+    fix(51, -121, 3);
 
-    await tally.hear(SENTENCE);
+    tally.setField(FULL);
+    expect(tally.getState().missing).toEqual([]);
+    tally.goPhoto();
+    expect(tally.getState().step).toBe('photo');
+    await tally.getTag();
     const s = tally.getState();
-    expect(s.draft).toMatchObject({ species: 'FD', dbhCm: 42, heightM: 30, straightness: 4, twist: 5, branchiness: 5 });
-    expect(s.phase).toBe('readback');
-    expect(s.missing).toEqual([]);
-    expect(tts.spoken.at(-1)).toMatch(/Douglas-fir/i);
-    expect(s.spoken).toBe(tts.spoken.at(-1));
-
-    await tally.hear('save');
-    const after = tally.getState();
-    expect(after.phase).toBe('saved');
-    expect(after.lastTag).toBe('J-0001');
-    expect(after.draft).toEqual({});
-    expect(tts.spoken.at(-1)).toBe(tagSpeech('J-0001'));
+    expect(s.step).toBe('saved');
+    expect(s.lastTag).toBe('J-0001');
+    expect(s.draft).toEqual({});
+    // Voice prompts are off by default: nothing is spoken.
+    expect(tts.spoken).toEqual([]);
 
     const tree = repo.getState().trees[0];
-    expect(tree.tag).toBe('J-0001');
-    expect(tree.species).toBe('FD');
-    expect(tree.fixCount).toBe(2);
-    expect(tree.lat).toBeGreaterThan(50.7);
+    expect(tree).toMatchObject({ tag: 'J-0001', species: 'FD', fixCount: 2 });
+    expect(tree.lat).toBeLessThan(50.71);
     expect((await verifyChain(repo.getState().events.map((e) => e.event))).ok).toBe(true);
   });
 
-  it('reads back missing fields and loops until answered', async () => {
-    const { tally, tts } = await makeRig();
-    await tally.press();
-    await tally.hear('fir forty two');
-    expect(tally.getState().missing).toEqual(expect.arrayContaining(['heightM', 'straightness', 'twist', 'branchiness']));
-    expect(tts.spoken.at(-1)).toMatch(/missing/i);
-    await tally.hear('thirty metres straight four twist three branchy two');
-    expect(tally.getState().missing).toEqual([]);
-    expect(tally.getState().draft).toMatchObject({ heightM: 30, straightness: 4, twist: 3, branchiness: 2 });
+  it('pins automatically after the averaging window', async () => {
+    const { tally, fix } = await makeRig({ pinMs: 6000 });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      tally.newTree();
+      fix();
+      vi.advanceTimersByTime(6000);
+      expect(tally.getState().pin.status).toBe('pinned');
+      tally.rePin();
+      expect(tally.getState().pin.status).toBe('pinning');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('applies spoken corrections', async () => {
-    const { tally } = await makeRig();
-    await tally.press();
-    await tally.hear(SENTENCE);
-    await tally.hear('no, forty four');
-    expect(tally.getState().draft.dbhCm).toBe(44);
-    expect(tally.getState().draft.species).toBe('FD');
+  it('missing fields ask to confirm, then tag anyway', async () => {
+    const { tally, repo } = await makeRig({ imperial: true });
+    tally.newTree();
+    tally.setField({ species: 'FD', circumferenceCm: 190.5, dbhCm: 60.6, heightM: 30, straightness: 4 });
+    expect(tally.getState().showMissing).toBe(false);
+    await tally.getTag();
+    expect(tally.getState().confirmMissing).toEqual(['twist', 'branchiness']);
+    expect(tally.getState().showMissing).toBe(true);
+    expect(repo.getState().trees).toHaveLength(0);
+    await tally.getTag(true);
+    expect(tally.getState().lastTag).toBe('J-0001');
   });
 
-  it('clicker press in readback saves; press after save starts the next tree', async () => {
+  it('needs species and girth, named as circumference in circumference mode', async () => {
+    const { tally, repo } = await makeRig({ imperial: true });
+    tally.newTree();
+    tally.setField({ species: 'FD' });
+    await tally.getTag(true);
+    expect(repo.getState().trees).toHaveLength(0);
+    expect(tally.getState().notice).toMatch(/circumference/);
+    expect(tally.getState().notice).not.toMatch(/DBH/);
+  });
+
+  it('clicker steps through the flow and never starts the mic', async () => {
     const { tally, repo } = await makeRig();
     await tally.press();
-    await tally.hear(SENTENCE);
-    expect(tally.getState().phase).toBe('readback');
+    expect(tally.getState().step).toBe('measure');
+    tally.setField(FULL);
     await tally.press();
-    expect(tally.getState().phase).toBe('saved');
+    expect(tally.getState().step).toBe('photo');
+    await tally.press();
+    expect(tally.getState().step).toBe('saved');
     expect(repo.getState().trees).toHaveLength(1);
     await tally.press();
-    expect(tally.getState().phase).toBe('listening');
-    expect(tally.getState().draft).toEqual({});
+    expect(tally.getState().step).toBe('measure');
+    expect(tally.getState().voice).toBe(false);
+    expect(tally.getState().mic).toBe('off');
   });
 
-  it('talking right after a save starts a new draft (zero taps)', async () => {
-    const { tally, repo } = await makeRig();
-    await tally.press();
-    await tally.hear(SENTENCE);
-    await tally.hear('save');
-    await tally.hear('pine twenty eight twenty two metres straight five twist four branchy four');
-    expect(tally.getState().draft.species).toBe('PL');
-    await tally.hear('save');
-    expect(repo.getState().trees.map((t) => t.tag).sort()).toEqual(['J-0001', 'J-0002']);
-  });
-
-  it('repeat re-speaks the tag', async () => {
-    const { tally, tts } = await makeRig();
-    await tally.press();
-    await tally.hear(SENTENCE);
-    await tally.hear('save');
-    tts.spoken.length = 0;
-    await tally.hear('repeat');
-    expect(tts.spoken).toEqual([tagSpeech('J-0001')]);
-    expect(tally.getState().phase).toBe('saved');
+  it('cancel uses no number', async () => {
+    const { tally } = await makeRig();
+    tally.newTree();
+    tally.setField({ species: 'PL', dbhCm: 30 });
+    tally.cancelTree();
+    expect(tally.getState().step).toBe('idle');
+    tally.newTree();
+    tally.setField(FULL);
+    await tally.getTag();
+    expect(tally.getState().lastTag).toBe('J-0001');
   });
 
   it('undo voids the last tree and never reuses its number', async () => {
-    const { tally, repo, tts } = await makeRig();
-    await tally.press();
-    await tally.hear(SENTENCE);
-    await tally.hear('save');
-    await tally.hear(SENTENCE);
-    await tally.hear('save');
+    const { tally, repo } = await makeRig();
+    for (let i = 0; i < 2; i++) {
+      tally.newTree();
+      tally.setField(FULL);
+      await tally.getTag();
+    }
     expect(tally.getState().lastTag).toBe('J-0002');
-    await tally.hear('undo');
-    const voided = repo.getState().trees.find((t) => t.tag === 'J-0002')!;
-    expect(voided.voided).toBe(true);
-    expect(tts.spoken.at(-1)).toMatch(/voided/i);
+    await tally.undo();
+    expect(repo.getState().trees.find((t) => t.tag === 'J-0002')!.voided).toBe(true);
     expect(tally.getState().lastTag).toBe('J-0001');
-    await tally.hear(SENTENCE);
-    await tally.hear('save');
+    tally.newTree();
+    tally.setField(FULL);
+    await tally.getTag();
     expect(tally.getState().lastTag).toBe('J-0003');
     const events = repo.getState().events.map((e) => e.event);
     expect(events.map((e) => e.type)).toEqual(['create', 'create', 'void', 'create']);
@@ -113,50 +139,141 @@ describe('tally state machine', () => {
 
   it('leave trees use the L series', async () => {
     const { tally } = await makeRig();
-    await tally.press();
-    await tally.hear('leave tree fir sixty');
-    expect(tally.getState().draft.leaveTree).toBe(true);
-    await tally.hear('save');
+    tally.newTree();
+    tally.setField({ species: 'FD', dbhCm: 60, leaveTree: true });
+    await tally.getTag();
     expect(tally.getState().lastTag).toBe('J-L0001');
+  });
+
+  it('voice prompts setting speaks the tag without a mic', async () => {
+    const { tally, tts, repo } = await makeRig();
+    await repo.saveSettings({ voicePrompts: true });
+    tally.newTree();
+    tally.setField(FULL);
+    await tally.getTag();
+    expect(tts.spoken.at(-1)).toBe(tagSpeech('J-0001'));
+    expect(tally.getState().mic).toBe('off');
+  });
+
+  it('clinometer sets the height', async () => {
+    const { tally } = await makeRig();
+    tally.newTree();
+    tally.setField({ species: 'FD', dbhCm: 40 });
+    await tally.setHeight(27.4);
+    expect(tally.getState().draft).toMatchObject({ heightM: 27.4, heightSource: 'clinometer', dbhCm: 40 });
+  });
+});
+
+describe('tally: optional voice', () => {
+  it('typed transcript fills the form, reads back, and saves', async () => {
+    const { tally, tts, repo } = await makeRig();
+    tally.newTree();
+    await tally.toggleVoice();
+    expect(tally.getState()).toMatchObject({ voice: true, mic: 'listening' });
+    tally.submitText(SENTENCE);
+    await vi.waitFor(() => expect(tally.getState().draft).toMatchObject(FULL));
+    await vi.waitFor(() => expect(tts.spoken.at(-1)).toMatch(/Douglas-fir/i));
+    tally.submitText('save');
+    await vi.waitFor(() => expect(tally.getState().lastTag).toBe('J-0001'));
+    expect(tts.spoken).toContain(tagSpeech('J-0001'));
+    expect(repo.getState().trees).toHaveLength(1);
+    await tally.voiceOff();
+    expect(tally.getState()).toMatchObject({ voice: false, mic: 'off' });
+  });
+
+  it('"new tree" by voice starts a tree', async () => {
+    const { tally } = await makeRig();
+    await tally.toggleVoice();
+    await tally.hear('new tree');
+    expect(tally.getState()).toMatchObject({ step: 'measure', pin: { status: 'pinning' } });
+  });
+
+  it('spoken corrections replace the last number', async () => {
+    const { tally } = await makeRig();
+    tally.newTree();
     await tally.hear(SENTENCE);
+    await tally.hear('no, forty four');
+    expect(tally.getState().draft).toMatchObject({ dbhCm: 44, species: 'FD' });
+  });
+
+  it('"save" with gaps asks again, naming circumference', async () => {
+    const { tally, tts } = await makeRig({ imperial: true });
+    tally.newTree();
+    await tally.toggleVoice();
+    await tally.hear('fir seventy five');
+    await tally.hear('save');
+    expect(tally.getState().confirmMissing).toEqual(expect.arrayContaining(['heightM', 'twist']));
+    expect(tts.spoken.at(-1)).toMatch(/^Missing height/);
     await tally.hear('save');
     expect(tally.getState().lastTag).toBe('J-0001');
   });
 
-  it('typed transcripts go through the speech engine', async () => {
-    const { tally } = await makeRig();
-    await tally.press();
-    tally.submitText(SENTENCE);
-    await vi.waitFor(() => expect(tally.getState().phase).toBe('readback'));
-    expect(tally.getState().draft.dbhCm).toBe(42);
+  it('readback names circumference, not DBH, when it is missing', async () => {
+    const { tally, tts } = await makeRig({ imperial: true });
+    tally.newTree();
+    await tally.toggleVoice();
+    await tally.hear('fir ninety eight feet');
+    expect(tts.spoken.at(-1)).toMatch(/Missing: circumference/);
   });
 
-  it('measure height command and clinometer result', async () => {
-    const { tally } = await makeRig();
-    const onMeasure = vi.fn();
-    tally.setOnMeasureHeight(onMeasure);
-    await tally.press();
-    await tally.hear('fir forty');
-    await tally.hear('measure height');
-    expect(onMeasure).toHaveBeenCalledOnce();
-    await tally.setHeight(27.4);
-    expect(tally.getState().draft).toMatchObject({ heightM: 27.4, heightSource: 'clinometer', dbhCm: 40 });
+  it('10 s of silence drops back to the form', async () => {
+    const mic = new FakeMic();
+    const { tally } = await makeRig({ speech: mic });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      tally.newTree();
+      tally.setField({ species: 'FD' });
+      await tally.toggleVoice();
+      expect(tally.getState().mic).toBe('listening');
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(tally.getState()).toMatchObject({ voice: false, mic: 'off', step: 'measure' });
+      expect(tally.getState().notice).toMatch(/Didn't hear anything/);
+      expect(tally.getState().draft.species).toBe('FD');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the live partial transcript and stops on errors', async () => {
+    const mic = new FakeMic();
+    const { tally } = await makeRig({ speech: mic, silenceMs: 50 });
+    tally.newTree();
+    await tally.toggleVoice();
+    mic.partial('big fir');
+    expect(tally.getState().partial).toBe('big fir');
+    mic.fail('network');
+    await vi.waitFor(() => expect(tally.getState().voice).toBe(false));
+    expect(tally.getState().notice).toMatch(/Voice stopped: network/);
+    expect(tally.getState().step).toBe('measure');
+  });
+
+  it('a failing microphone start is a notice, not a crash', async () => {
+    const mic = new FakeMic();
+    mic.start = async () => {
+      throw new Error('plugin missing');
+    };
+    const { tally } = await makeRig({ speech: mic });
+    tally.newTree();
+    await tally.toggleVoice();
+    expect(tally.getState()).toMatchObject({ voice: false, mic: 'off', step: 'measure' });
+    expect(tally.getState().notice).toMatch(/plugin missing/);
   });
 
   it('falls back to the interpreter when the parser is unsure', async () => {
     const interpret = vi.fn(async () => ({ species: 'CW' as const, dbhCm: 55 }));
     const { tally } = await makeRig({ interpreter: { available: true, interpret } });
-    await tally.press();
+    tally.newTree();
     await tally.hear('uh that big red one by the creek maybe');
     expect(interpret).toHaveBeenCalled();
     expect(tally.getState().draft).toMatchObject({ species: 'CW', dbhCm: 55 });
   });
 
-  it('nothing to save without species or dbh', async () => {
-    const { tally, repo, tts } = await makeRig();
-    await tally.press();
-    await tally.hear('save');
-    expect(repo.getState().trees).toHaveLength(0);
-    expect(tts.spoken.at(-1)).toMatch(/nothing to save/i);
+  it('repeat re-speaks the tag', async () => {
+    const { tally, tts } = await makeRig();
+    tally.newTree();
+    tally.setField(FULL);
+    await tally.getTag();
+    await tally.repeat();
+    expect(tts.spoken.at(-1)).toBe(tagSpeech('J-0001'));
   });
 });

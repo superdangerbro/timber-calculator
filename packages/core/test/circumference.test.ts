@@ -90,6 +90,10 @@ describe('readback units', () => {
   it('no circumference reads DBH plainly', () => {
     expect(readbackText({ species: 'FD', dbhCm: 61 }, { units: 'imperial' })).toMatch(/^Douglas-fir, 24 inches\./);
   });
+  it('a missing girth is "circumference" when that is how it is taped', () => {
+    expect(readbackText({ species: 'FD' }, { units: 'imperial', measure: 'circumference' })).toMatch(/Missing: circumference, height/);
+    expect(readbackText({ species: 'FD' }, { units: 'imperial' })).toMatch(/Missing: DBH, height/);
+  });
 });
 
 describe('circumference and photos in events and exports', () => {

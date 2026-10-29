@@ -13,7 +13,10 @@ export interface Settings {
   /** Optional block code prepended to tags ("CB12-J-0147"). */
   blockCode: string;
   activeBlockId: string | null;
+  /** Legacy (voice sessions always read back). */
   readback: boolean;
+  /** Speak prompts and the tag number for button presses too (voice sessions always speak). */
+  voicePrompts: boolean;
   ttsRate: number;
   /** Units for readback and display (storage is always metric). */
   units: UnitSystem;
@@ -39,6 +42,7 @@ export function defaultSettings(deviceId: string): Settings {
     blockCode: '',
     activeBlockId: null,
     readback: true,
+    voicePrompts: false,
     ttsRate: 1,
     units: 'imperial',
     measure: 'circumference',

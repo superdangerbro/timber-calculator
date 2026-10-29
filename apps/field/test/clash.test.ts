@@ -75,12 +75,13 @@ describe('tag clashes', () => {
 
   it('tally.retag shows and speaks the new tag', async () => {
     const rig = await makeRig();
+    await rig.repo.saveSettings({ voicePrompts: true });
     const mine = await rig.repo.createTree({ species: 'PL', dbhCm: 30 }, pos);
     await rig.repo.ingest([await foreignCreate('J-0001', 1, '2020-01-01T00:00:00.000Z')]);
     await rig.tally.retag(mine.id);
     const st = rig.tally.getState();
     expect(st.lastTag).toBe('J-0002');
-    expect(st.phase).toBe('saved');
+    expect(st.step).toBe('saved');
     expect(st.spoken).toMatch(/zero zero zero two/);
   });
 });

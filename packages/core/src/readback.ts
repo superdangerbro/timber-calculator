@@ -18,6 +18,8 @@ function num(n: number): string {
 export interface ReadbackOptions {
   /** Units to speak lengths in. Default 'metric'. */
   units?: UnitSystem;
+  /** How girth is taped. With 'circumference', a missing girth is spoken as "circumference". */
+  measure?: 'circumference' | 'dbh';
 }
 
 /** "75 inches" / "190.5 centimetres" for a girth stored in cm. */
@@ -50,7 +52,9 @@ export function readbackText(draft: TreeFields, opts: ReadbackOptions = {}): str
   if (draft.twist !== undefined) parts.push(`twist ${draft.twist}`);
   if (draft.branchiness !== undefined) parts.push(`branchiness ${draft.branchiness}`);
   if (draft.defects) parts.push(`defects: ${draft.defects}`);
-  const missing = missingFields(draft).map((k) => FIELD_SPEECH[k] ?? String(k));
+  const missing = missingFields(draft).map((k) =>
+    k === 'dbhCm' && opts.measure === 'circumference' ? 'circumference' : (FIELD_SPEECH[k] ?? String(k)),
+  );
   let out = parts.length ? `${parts.join(', ')}.` : 'Nothing recorded.';
   if (missing.length) out += ` Missing: ${missing.join(', ')}.`;
   return out;

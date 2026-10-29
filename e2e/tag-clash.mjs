@@ -21,6 +21,8 @@ const p = await c.newPage();
 p.on('pageerror', (e) => errors.push(String(e)));
 const tid = (i) => p.getByTestId(i);
 const waitPhase = (ph) => p.waitForFunction((ph) => document.querySelector('.tally')?.getAttribute('data-phase') === ph, ph, { timeout: 8000 });
+const waitReadback = () =>
+  p.waitForFunction(() => /^(?!Tag )\S/.test(document.querySelector('[data-testid=spoken]')?.textContent ?? ''), null, { timeout: 8000 });
 const say = async (t) => { await tid('type-input').fill(t); await tid('type-input').press('Enter'); await p.waitForTimeout(300); };
 
 await p.goto(FIELD);
@@ -29,9 +31,11 @@ await tid('units-metric').click(); // this script talks metric DBH
 await tid('measure-dbh').click();
 await tid('tab-tally').click();
 await p.waitForTimeout(800);
-await tid('talk').click();
+await tid('new-tree').click(); // New tree, then voice on (typed fallback)
+await tid('mic').click();
+await tid('listening').waitFor();
 await say('pine thirty twenty metres straight four twist four branchy four');
-await waitPhase('readback');
+await waitReadback();
 await say('save');
 await waitPhase('saved');
 const before = (await tid('tag-big').textContent()).trim();

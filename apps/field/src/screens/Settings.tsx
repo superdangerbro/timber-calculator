@@ -182,8 +182,8 @@ export function SettingsScreen() {
 
       <section className="set-section">
         <h2>Voice</h2>
-        <Row label="Read back" hint="speak what was heard + what's missing">
-          <Toggle on={st.readback} onChange={(v) => void save({ readback: v })} />
+        <Row label="Voice prompts" hint="also speak the tag when using buttons; voice entry (mic button) always reads back">
+          <Toggle on={!!st.voicePrompts} onChange={(v) => void save({ voicePrompts: v })} />
         </Row>
         <Row label={`Speech rate ${st.ttsRate.toFixed(1)}×`}>
           <input type="range" min={0.6} max={1.6} step={0.1} value={st.ttsRate} onChange={(e) => void save({ ttsRate: parseFloat(e.target.value) })} />

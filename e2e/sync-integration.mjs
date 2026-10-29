@@ -42,14 +42,18 @@ await p.screenshot({ path: `${SHOTS}/01-field-signed-in.png` });
 await tid('tab-tally').click();
 await p.waitForTimeout(800);
 const waitPhase = (ph) => p.waitForFunction((ph) => document.querySelector('.tally')?.getAttribute('data-phase') === ph, ph, { timeout: 8000 });
+const waitReadback = () =>
+  p.waitForFunction(() => /^(?!Tag )\S/.test(document.querySelector('[data-testid=spoken]')?.textContent ?? ''), null, { timeout: 8000 });
 const say = async (t) => {
   await tid('type-input').fill(t);
   await tid('type-input').press('Enter');
   await p.waitForTimeout(300);
 };
-await tid('talk').click();
+await tid('new-tree').click(); // New tree, then voice on (typed fallback)
+await tid('mic').click();
+await tid('listening').waitFor();
 await say('fir fifty one thirty two metres straight five no twist clean');
-await waitPhase('readback');
+await waitReadback();
 await say('save');
 await waitPhase('saved');
 const tag1 = (await tid('tag-big').textContent()).trim();
@@ -77,7 +81,7 @@ await tid('photo-sheet').waitFor({ state: 'detached', timeout: 15000 });
 await phone.setGeolocation({ latitude: 50.7003, longitude: -120.3499, accuracy: 4 });
 await p.waitForTimeout(1500);
 await say('cedar forty four twenty six metres straight three twist four branchy two rot at the butt');
-await waitPhase('readback');
+await waitReadback();
 await say('save');
 await waitPhase('saved');
 await p.screenshot({ path: `${SHOTS}/02-field-tallied.png` });
