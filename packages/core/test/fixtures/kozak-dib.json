@@ -1,0 +1,1141 @@
+{
+ "source": "bcgov/FAIBBase tests/testthat/test-DIB_ICalculator.R (Apache-2.0); expected values from the provincial SAS compiler",
+ "cases": [
+  {
+   "bec": "BWBS",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 32.6,
+   "dbhCm": 99.4,
+   "dibCm": 88.5768
+  },
+  {
+   "bec": "CDF",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 12.7,
+   "dbhCm": 16.2,
+   "dibCm": 15.2838
+  },
+  {
+   "bec": "CWH",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 45.0,
+   "dbhCm": 191.5,
+   "dibCm": 173.6924
+  },
+  {
+   "bec": "ESSF",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 24.2,
+   "dbhCm": 44.1,
+   "dibCm": 38.7407
+  },
+  {
+   "bec": "ICH",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 37.1,
+   "dbhCm": 121.6,
+   "dibCm": 108.5873
+  },
+  {
+   "bec": "IDF",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 44.3,
+   "dbhCm": 114.2,
+   "dibCm": 109.9922
+  },
+  {
+   "bec": "MS",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 20.6,
+   "dbhCm": 31.6,
+   "dibCm": 29.2956
+  },
+  {
+   "bec": "PP",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 33.0,
+   "dbhCm": 55.8,
+   "dibCm": 52.6335
+  },
+  {
+   "bec": "SBPS",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 30.1,
+   "dbhCm": 57.4,
+   "dibCm": 54.1782
+  },
+  {
+   "bec": "SBS",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 39.5,
+   "dbhCm": 145.0,
+   "dibCm": 126.609
+  },
+  {
+   "bec": "SWB",
+   "species": "AC",
+   "heightM": 1.4,
+   "totalHeightM": 15.3,
+   "dbhCm": 24.8,
+   "dibCm": 21.0556
+  },
+  {
+   "bec": "AT",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 27.7,
+   "dbhCm": 37.0,
+   "dibCm": 34.9165
+  },
+  {
+   "bec": "BWBS",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 32.1,
+   "dbhCm": 81.5,
+   "dibCm": 79.1221
+  },
+  {
+   "bec": "CWH",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 25.7,
+   "dbhCm": 43.9,
+   "dibCm": 42.8118
+  },
+  {
+   "bec": "ESSF",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 25.6,
+   "dbhCm": 40.1,
+   "dibCm": 39.0334
+  },
+  {
+   "bec": "ICH",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 31.2,
+   "dbhCm": 58.9,
+   "dibCm": 59.2008
+  },
+  {
+   "bec": "IDF",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 21.2,
+   "dbhCm": 61.5,
+   "dibCm": 58.4637
+  },
+  {
+   "bec": "MS",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 31.7,
+   "dbhCm": 55.2,
+   "dibCm": 53.0551
+  },
+  {
+   "bec": "PP",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 5.8,
+   "dbhCm": 16.0,
+   "dibCm": 13.6587
+  },
+  {
+   "bec": "SBPS",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 27.3,
+   "dbhCm": 57.1,
+   "dibCm": 52.0982
+  },
+  {
+   "bec": "SBS",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 33.0,
+   "dbhCm": 77.2,
+   "dibCm": 70.9857
+  },
+  {
+   "bec": "SWB",
+   "species": "AT",
+   "heightM": 1.4,
+   "totalHeightM": 21.4,
+   "dbhCm": 32.6,
+   "dibCm": 30.1339
+  },
+  {
+   "bec": "AT",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 23.9,
+   "dbhCm": 81.6,
+   "dibCm": 71.6069
+  },
+  {
+   "bec": "BWBS",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 27.8,
+   "dbhCm": 56.8,
+   "dibCm": 53.4621
+  },
+  {
+   "bec": "CDF",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 30.0,
+   "dbhCm": 35.5,
+   "dibCm": 33.6486
+  },
+  {
+   "bec": "CWH",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 56.5,
+   "dbhCm": 147.3,
+   "dibCm": 142.4649
+  },
+  {
+   "bec": "ESSF",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 39.0,
+   "dbhCm": 92.0,
+   "dibCm": 88.1287
+  },
+  {
+   "bec": "ICH",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 43.8,
+   "dbhCm": 95.6,
+   "dibCm": 91.2637
+  },
+  {
+   "bec": "IDF",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 30.6,
+   "dbhCm": 66.1,
+   "dibCm": 64.1968
+  },
+  {
+   "bec": "MH",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 54.8,
+   "dbhCm": 127.8,
+   "dibCm": 122.2297
+  },
+  {
+   "bec": "MS",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 39.9,
+   "dbhCm": 93.0,
+   "dibCm": 89.9853
+  },
+  {
+   "bec": "SBPS",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 20.5,
+   "dbhCm": 22.0,
+   "dibCm": 21.3482
+  },
+  {
+   "bec": "SBS",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 37.5,
+   "dbhCm": 103.3,
+   "dibCm": 98.2528
+  },
+  {
+   "bec": "SWB",
+   "species": "B",
+   "heightM": 1.4,
+   "totalHeightM": 11.6,
+   "dbhCm": 44.0,
+   "dibCm": 40.2907
+  },
+  {
+   "bec": "AT",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 16.0,
+   "dbhCm": 18.2,
+   "dibCm": 17.6753
+  },
+  {
+   "bec": "CDF",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 38.5,
+   "dbhCm": 79.2,
+   "dibCm": 75.2183
+  },
+  {
+   "bec": "CWH",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 51.0,
+   "dbhCm": 341.3,
+   "dibCm": 304.0391
+  },
+  {
+   "bec": "ESSF",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 31.4,
+   "dbhCm": 140.6,
+   "dibCm": 131.7553
+  },
+  {
+   "bec": "ICH",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 33.0,
+   "dbhCm": 226.0,
+   "dibCm": 203.3313
+  },
+  {
+   "bec": "IDF",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 39.3,
+   "dbhCm": 108.6,
+   "dibCm": 102.8913
+  },
+  {
+   "bec": "MH",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 30.6,
+   "dbhCm": 129.4,
+   "dibCm": 118.1729
+  },
+  {
+   "bec": "MS",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 31.0,
+   "dbhCm": 62.4,
+   "dibCm": 59.8681
+  },
+  {
+   "bec": "PP",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 4.1,
+   "dbhCm": 6.7,
+   "dibCm": 5.9023
+  },
+  {
+   "bec": "SBPS",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 13.1,
+   "dbhCm": 9.2,
+   "dibCm": 8.9068
+  },
+  {
+   "bec": "SBS",
+   "species": "C",
+   "heightM": 1.4,
+   "totalHeightM": 27.3,
+   "dbhCm": 68.1,
+   "dibCm": 63.9218
+  },
+  {
+   "bec": "CDF",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 43.2,
+   "dbhCm": 57.3,
+   "dibCm": 55.9791
+  },
+  {
+   "bec": "CWH",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 34.3,
+   "dbhCm": 81.0,
+   "dibCm": 80.8138
+  },
+  {
+   "bec": "ESSF",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 4.4,
+   "dbhCm": 8.3,
+   "dibCm": 7.8185
+  },
+  {
+   "bec": "ICH",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 17.9,
+   "dbhCm": 19.4,
+   "dibCm": 18.6049
+  },
+  {
+   "bec": "IDF",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 20.2,
+   "dbhCm": 34.4,
+   "dibCm": 33.6427
+  },
+  {
+   "bec": "MH",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 4.0,
+   "dbhCm": 4.9,
+   "dibCm": 4.4833
+  },
+  {
+   "bec": "MS",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 8.0,
+   "dbhCm": 10.0,
+   "dibCm": 9.4875
+  },
+  {
+   "bec": "SBS",
+   "species": "D",
+   "heightM": 1.4,
+   "totalHeightM": 10.5,
+   "dbhCm": 12.6,
+   "dibCm": 12.0164
+  },
+  {
+   "bec": "BWBS",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 18.1,
+   "dbhCm": 44.5,
+   "dibCm": 43.8479
+  },
+  {
+   "bec": "CWH",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 26.0,
+   "dbhCm": 56.5,
+   "dibCm": 56.4658
+  },
+  {
+   "bec": "ESSF",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 23.0,
+   "dbhCm": 41.7,
+   "dibCm": 40.9834
+  },
+  {
+   "bec": "ICH",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 24.3,
+   "dbhCm": 73.8,
+   "dibCm": 75.9898
+  },
+  {
+   "bec": "IDF",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 26.2,
+   "dbhCm": 55.0,
+   "dibCm": 52.1811
+  },
+  {
+   "bec": "MS",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 16.9,
+   "dbhCm": 26.6,
+   "dibCm": 25.4127
+  },
+  {
+   "bec": "SBPS",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 13.1,
+   "dbhCm": 11.5,
+   "dibCm": 10.4705
+  },
+  {
+   "bec": "SBS",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 23.9,
+   "dbhCm": 66.0,
+   "dibCm": 66.4063
+  },
+  {
+   "bec": "SWB",
+   "species": "E",
+   "heightM": 1.4,
+   "totalHeightM": 5.8,
+   "dbhCm": 5.4,
+   "dibCm": 4.6033
+  },
+  {
+   "bec": "AT",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 3.8,
+   "dbhCm": 8.2,
+   "dibCm": 6.8466
+  },
+  {
+   "bec": "BWBS",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 19.3,
+   "dbhCm": 33.2,
+   "dibCm": 28.7675
+  },
+  {
+   "bec": "CDF",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 49.1,
+   "dbhCm": 188.4,
+   "dibCm": 146.8871
+  },
+  {
+   "bec": "CWH",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 3.0,
+   "dbhCm": 240.0,
+   "dibCm": 143.5101
+  },
+  {
+   "bec": "ESSF",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 54.1,
+   "dbhCm": 113.0,
+   "dibCm": 98.5498
+  },
+  {
+   "bec": "ICH",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 38.9,
+   "dbhCm": 115.6,
+   "dibCm": 98.5763
+  },
+  {
+   "bec": "IDF",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 38.0,
+   "dbhCm": 139.7,
+   "dibCm": 113.5813
+  },
+  {
+   "bec": "MH",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 30.0,
+   "dbhCm": 117.9,
+   "dibCm": 91.7572
+  },
+  {
+   "bec": "MS",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 36.7,
+   "dbhCm": 138.1,
+   "dibCm": 109.008
+  },
+  {
+   "bec": "PP",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 22.5,
+   "dbhCm": 91.3,
+   "dibCm": 72.7844
+  },
+  {
+   "bec": "SBPS",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 37.1,
+   "dbhCm": 134.3,
+   "dibCm": 110.0211
+  },
+  {
+   "bec": "SBS",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 49.0,
+   "dbhCm": 130.2,
+   "dibCm": 110.4554
+  },
+  {
+   "bec": "SWB",
+   "species": "F",
+   "heightM": 1.4,
+   "totalHeightM": 16.7,
+   "dbhCm": 24.2,
+   "dibCm": 20.9267
+  },
+  {
+   "bec": "AT",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 34.6,
+   "dbhCm": 99.1,
+   "dibCm": 90.089
+  },
+  {
+   "bec": "CDF",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 23.3,
+   "dbhCm": 42.1,
+   "dibCm": 38.9181
+  },
+  {
+   "bec": "CWH",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 52.3,
+   "dbhCm": 189.9,
+   "dibCm": 174.3518
+  },
+  {
+   "bec": "ESSF",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 25.2,
+   "dbhCm": 110.0,
+   "dibCm": 103.6548
+  },
+  {
+   "bec": "ICH",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 53.8,
+   "dbhCm": 113.3,
+   "dibCm": 102.6671
+  },
+  {
+   "bec": "IDF",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 22.5,
+   "dbhCm": 40.5,
+   "dibCm": 37.9874
+  },
+  {
+   "bec": "MH",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 36.2,
+   "dbhCm": 127.5,
+   "dibCm": 111.9426
+  },
+  {
+   "bec": "MS",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 12.7,
+   "dbhCm": 27.1,
+   "dibCm": 24.5784
+  },
+  {
+   "bec": "SBS",
+   "species": "H",
+   "heightM": 1.4,
+   "totalHeightM": 27.1,
+   "dbhCm": 95.3,
+   "dibCm": 92.5496
+  },
+  {
+   "bec": "AT",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 14.2,
+   "dbhCm": 27.8,
+   "dibCm": 25.92
+  },
+  {
+   "bec": "BWBS",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 20.0,
+   "dbhCm": 43.0,
+   "dibCm": 41.2437
+  },
+  {
+   "bec": "ESSF",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 36.0,
+   "dbhCm": 81.7,
+   "dibCm": 64.8479
+  },
+  {
+   "bec": "ICH",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 39.6,
+   "dbhCm": 86.4,
+   "dibCm": 73.9604
+  },
+  {
+   "bec": "IDF",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 32.8,
+   "dbhCm": 64.0,
+   "dibCm": 53.1383
+  },
+  {
+   "bec": "MS",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 34.6,
+   "dbhCm": 85.8,
+   "dibCm": 70.0625
+  },
+  {
+   "bec": "SBS",
+   "species": "L",
+   "heightM": 1.4,
+   "totalHeightM": 16.3,
+   "dbhCm": 37.8,
+   "dibCm": 32.6558
+  },
+  {
+   "bec": "AT",
+   "species": "MB",
+   "heightM": 1.4,
+   "totalHeightM": 16.8,
+   "dbhCm": 23.1,
+   "dibCm": 22.172
+  },
+  {
+   "bec": "CDF",
+   "species": "MB",
+   "heightM": 1.4,
+   "totalHeightM": 31.8,
+   "dbhCm": 60.0,
+   "dibCm": 63.619
+  },
+  {
+   "bec": "CWH",
+   "species": "MB",
+   "heightM": 1.4,
+   "totalHeightM": 28.1,
+   "dbhCm": 100.7,
+   "dibCm": 104.5426
+  },
+  {
+   "bec": "ICH",
+   "species": "MB",
+   "heightM": 1.4,
+   "totalHeightM": 9.2,
+   "dbhCm": 11.7,
+   "dibCm": 10.1968
+  },
+  {
+   "bec": "IDF",
+   "species": "MB",
+   "heightM": 1.4,
+   "totalHeightM": 11.8,
+   "dbhCm": 17.9,
+   "dibCm": 16.2272
+  },
+  {
+   "bec": "SBS",
+   "species": "MB",
+   "heightM": 1.4,
+   "totalHeightM": 7.3,
+   "dbhCm": 6.2,
+   "dibCm": 5.2173
+  },
+  {
+   "bec": "AT",
+   "species": "PA",
+   "heightM": 1.4,
+   "totalHeightM": 18.0,
+   "dbhCm": 51.3,
+   "dibCm": 50.4824
+  },
+  {
+   "bec": "ESSF",
+   "species": "PA",
+   "heightM": 1.4,
+   "totalHeightM": 18.4,
+   "dbhCm": 75.2,
+   "dibCm": 75.2814
+  },
+  {
+   "bec": "ICH",
+   "species": "PA",
+   "heightM": 1.4,
+   "totalHeightM": 12.7,
+   "dbhCm": 28.4,
+   "dibCm": 27.194
+  },
+  {
+   "bec": "MH",
+   "species": "PA",
+   "heightM": 1.4,
+   "totalHeightM": 10.2,
+   "dbhCm": 29.7,
+   "dibCm": 28.4506
+  },
+  {
+   "bec": "MS",
+   "species": "PA",
+   "heightM": 1.4,
+   "totalHeightM": 9.4,
+   "dbhCm": 17.5,
+   "dibCm": 16.3715
+  },
+  {
+   "bec": "AT",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 14.6,
+   "dbhCm": 28.2,
+   "dibCm": 26.5618
+  },
+  {
+   "bec": "BWBS",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 30.7,
+   "dbhCm": 52.9,
+   "dibCm": 51.4707
+  },
+  {
+   "bec": "CDF",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 11.6,
+   "dbhCm": 46.0,
+   "dibCm": 43.6146
+  },
+  {
+   "bec": "CWH",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 31.2,
+   "dbhCm": 84.3,
+   "dibCm": 80.1865
+  },
+  {
+   "bec": "ESSF",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 21.6,
+   "dbhCm": 66.2,
+   "dibCm": 63.2863
+  },
+  {
+   "bec": "ICH",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 39.8,
+   "dbhCm": 66.4,
+   "dibCm": 63.2796
+  },
+  {
+   "bec": "IDF",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 30.5,
+   "dbhCm": 54.3,
+   "dibCm": 52.4181
+  },
+  {
+   "bec": "MH",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 13.4,
+   "dbhCm": 34.4,
+   "dibCm": 32.3565
+  },
+  {
+   "bec": "MS",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 24.4,
+   "dbhCm": 53.3,
+   "dibCm": 49.6075
+  },
+  {
+   "bec": "SBPS",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 23.5,
+   "dbhCm": 53.1,
+   "dibCm": 50.8692
+  },
+  {
+   "bec": "SBS",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 31.7,
+   "dbhCm": 71.6,
+   "dibCm": 69.961
+  },
+  {
+   "bec": "SWB",
+   "species": "PL",
+   "heightM": 1.4,
+   "totalHeightM": 10.2,
+   "dbhCm": 40.3,
+   "dibCm": 39.9555
+  },
+  {
+   "bec": "CDF",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 26.8,
+   "dbhCm": 36.9,
+   "dibCm": 35.5368
+  },
+  {
+   "bec": "CWH",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 36.7,
+   "dbhCm": 77.8,
+   "dibCm": 75.6815
+  },
+  {
+   "bec": "ESSF",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 42.7,
+   "dbhCm": 112.9,
+   "dibCm": 104.4669
+  },
+  {
+   "bec": "ICH",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 37.7,
+   "dbhCm": 102.0,
+   "dibCm": 94.0637
+  },
+  {
+   "bec": "IDF",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 39.3,
+   "dbhCm": 58.1,
+   "dibCm": 56.5361
+  },
+  {
+   "bec": "MH",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 39.4,
+   "dbhCm": 75.5,
+   "dibCm": 70.9877
+  },
+  {
+   "bec": "MS",
+   "species": "PW",
+   "heightM": 1.4,
+   "totalHeightM": 30.0,
+   "dbhCm": 80.6,
+   "dibCm": 75.843
+  },
+  {
+   "bec": "ICH",
+   "species": "PY",
+   "heightM": 1.4,
+   "totalHeightM": 40.9,
+   "dbhCm": 89.8,
+   "dibCm": 82.8036
+  },
+  {
+   "bec": "IDF",
+   "species": "PY",
+   "heightM": 1.4,
+   "totalHeightM": 30.1,
+   "dbhCm": 96.6,
+   "dibCm": 90.0052
+  },
+  {
+   "bec": "PP",
+   "species": "PY",
+   "heightM": 1.4,
+   "totalHeightM": 41.9,
+   "dbhCm": 110.2,
+   "dibCm": 105.1527
+  },
+  {
+   "bec": "AT",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 33.8,
+   "dbhCm": 85.1,
+   "dibCm": 82.4539
+  },
+  {
+   "bec": "BWBS",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 33.0,
+   "dbhCm": 74.8,
+   "dibCm": 73.2947
+  },
+  {
+   "bec": "CDF",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 49.7,
+   "dbhCm": 74.2,
+   "dibCm": 72.7973
+  },
+  {
+   "bec": "CWH",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 55.2,
+   "dbhCm": 284.0,
+   "dibCm": 270.5925
+  },
+  {
+   "bec": "ESSF",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 39.9,
+   "dbhCm": 113.8,
+   "dibCm": 110.6431
+  },
+  {
+   "bec": "ICH",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 44.1,
+   "dbhCm": 133.0,
+   "dibCm": 127.4502
+  },
+  {
+   "bec": "IDF",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 39.3,
+   "dbhCm": 79.7,
+   "dibCm": 80.1027
+  },
+  {
+   "bec": "MH",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 34.5,
+   "dbhCm": 160.6,
+   "dibCm": 154.3443
+  },
+  {
+   "bec": "MS",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 41.9,
+   "dbhCm": 105.8,
+   "dibCm": 103.0301
+  },
+  {
+   "bec": "PP",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 17.6,
+   "dbhCm": 38.5,
+   "dibCm": 37.5221
+  },
+  {
+   "bec": "SBPS",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 32.0,
+   "dbhCm": 58.6,
+   "dibCm": 56.3192
+  },
+  {
+   "bec": "SBS",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 34.3,
+   "dbhCm": 116.1,
+   "dibCm": 113.0208
+  },
+  {
+   "bec": "SWB",
+   "species": "S",
+   "heightM": 1.4,
+   "totalHeightM": 25.4,
+   "dbhCm": 62.4,
+   "dibCm": 59.5934
+  },
+  {
+   "bec": "AT",
+   "species": "Y",
+   "heightM": 1.4,
+   "totalHeightM": 4.5,
+   "dbhCm": 23.2,
+   "dibCm": 21.2429
+  },
+  {
+   "bec": "CWH",
+   "species": "Y",
+   "heightM": 1.4,
+   "totalHeightM": 52.0,
+   "dbhCm": 190.0,
+   "dibCm": 172.5651
+  },
+  {
+   "bec": "ESSF",
+   "species": "Y",
+   "heightM": 1.4,
+   "totalHeightM": 18.1,
+   "dbhCm": 47.2,
+   "dibCm": 44.5048
+  },
+  {
+   "bec": "ICH",
+   "species": "Y",
+   "heightM": 1.4,
+   "totalHeightM": 4.5,
+   "dbhCm": 6.6,
+   "dibCm": 6.4103
+  },
+  {
+   "bec": "MH",
+   "species": "Y",
+   "heightM": 1.4,
+   "totalHeightM": 25.8,
+   "dbhCm": 132.4,
+   "dibCm": 119.6112
+  }
+ ]
+}

@@ -19,6 +19,9 @@ importers:
       '@capacitor-community/text-to-speech':
         specifier: ^6.0.0
         version: 6.1.0(@capacitor/core@7.6.9)
+      '@capacitor/camera':
+        specifier: ^7.0.5
+        version: 7.0.5(@capacitor/core@7.6.9)
       '@capacitor/core':
         specifier: ^7.4.0
         version: 7.6.9
@@ -268,6 +271,11 @@ packages:
 
   '@capacitor-community/text-to-speech@6.1.0':
     resolution: {integrity: sha512-K9kbQm7BEkUGhZQYMrPaLfHTbOjQPtXZyQTtZxR+lNJyl1pbSFWwRmK3PCIa5C5M2HLf3iPgj/vTaMvMxlk1Ag==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/camera@7.0.5':
+    resolution: {integrity: sha512-+53f1xHq8on7O+ULXbgWp00ooWvn3fUkWxTP3p5zHi1nVriCxLbYnY0zTpZQqn52M96vclFKkoABbTVQ3x755w==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
@@ -2509,6 +2517,10 @@ snapshots:
       jeep-sqlite: 2.8.0
 
   '@capacitor-community/text-to-speech@6.1.0(@capacitor/core@7.6.9)':
+    dependencies:
+      '@capacitor/core': 7.6.9
+
+  '@capacitor/camera@7.0.5(@capacitor/core@7.6.9)':
     dependencies:
       '@capacitor/core': 7.6.9
 

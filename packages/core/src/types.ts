@@ -45,10 +45,30 @@ export interface AveragedPosition {
   fixCount: number;
 }
 
+export type PositionSource = 'gps' | 'adjusted';
+
+/**
+ * Position written in create/update payloads. When the cruiser moves the pin by
+ * hand, lat/lon are the adjusted spot and gpsLat/gpsLon/gpsAccuracyM keep the raw
+ * averaged fix, so the record still shows where the phone actually was.
+ */
+export interface TreePosition extends AveragedPosition {
+  positionSource?: PositionSource;
+  gpsLat?: number;
+  gpsLon?: number;
+  gpsAccuracyM?: number;
+}
+
 /** Everything that can be measured or said about a tree. All optional while drafting. */
 export interface TreeFields {
   species?: SpeciesCode;
+  /** Diameter at breast height, cm. Derived from circumference (C / pi) when that was measured. */
   dbhCm?: number;
+  /**
+   * Circumference at breast height, cm, when that is what was measured. null means
+   * "cleared" (DBH was given directly afterwards).
+   */
+  circumferenceCm?: number | null;
   /** Marketable (merchantable) height, metres. */
   heightM?: number;
   /** How the height was obtained. */
@@ -57,9 +77,34 @@ export interface TreeFields {
   twist?: Scale;
   branchiness?: Scale;
   defects?: string;
+  /** Pole-buyer faults seen on the stem. Any one knocks the tree out of pole grade. */
+  poleFaults?: PoleFault[];
   leaveTree?: boolean;
   notes?: string;
 }
+
+/**
+ * Faults that disqualify a pole (Stella-Jones red cedar card, July 2026):
+ * damage deeper than 1", splits/cracks/breaks, butt or top rot, bark seams deeper
+ * than 2", spike knots/burls/bunch knots, shake in the outer 2", excess sweep.
+ */
+export type PoleFault = 'damage' | 'split' | 'rot' | 'barkSeam' | 'knots' | 'shake' | 'sweep';
+
+/** A photo attached to a tree. The image bytes sync separately, keyed by id. */
+export interface TreePhoto {
+  id: string; // uuid v4
+  takenAt: string; // ISO
+  lat?: number | null;
+  lon?: number | null;
+  width: number;
+  height: number;
+  bytes: number;
+  /** sha-256 hex of the JPEG bytes, so the event log vouches for the image. */
+  sha256: string;
+}
+
+/** Display/readback units. Storage is always metric. */
+export type UnitSystem = 'metric' | 'imperial';
 
 export type TreeEventType = 'create' | 'update' | 'void' | 'status';
 
@@ -71,7 +116,7 @@ export interface TreeEvent {
   type: TreeEventType;
   /**
    * create: { tag, tagNumber, prefix, blockId?, position, fields }
-   * update: { fields } (partial; only changed fields)
+   * update: { fields } (partial; only changed fields) and/or { photos: TreePhoto[] } (appended)
    * void:   { reason? }
    * status: { status, stumpDiameterCm? }
    */
@@ -96,6 +141,11 @@ export interface Tree extends TreeFields {
   lon: number;
   accuracyM: number;
   fixCount: number;
+  /** 'adjusted' when the pin was moved by hand; the raw fix is in gpsLat/gpsLon. */
+  positionSource?: PositionSource;
+  gpsLat?: number | null;
+  gpsLon?: number | null;
+  gpsAccuracyM?: number | null;
   status: TreeStatus;
   voided: boolean;
   stumpDiameterCm?: number | null;
@@ -103,6 +153,8 @@ export interface Tree extends TreeFields {
   deviceId: string;
   createdAt: string;
   updatedAt: string;
+  /** Photos in the order they were added; the first is the thumbnail. */
+  photos?: TreePhoto[];
   /** Number of events folded into this tree. */
   version: number;
 }
@@ -117,7 +169,27 @@ export interface Block {
   createdAt: string;
 }
 
-/** Placeholder pole spec until Joe confirms buyer specs. All editable in a Scenario. */
+/** One row of a pole buyer's card: from this diameter at 6 ft, these cut lengths. */
+export interface PoleCardRow {
+  /** Minimum diameter 6 ft up from the butt, inches over bark. */
+  minDiam6FtIn: number;
+  /** Cut lengths (feet) a stem this size may be made into, longest first. */
+  lengthsFt: number[];
+  /** Minimum top diameter, inches over bark. */
+  minTopIn: number;
+}
+
+/** A pole buyer's length-by-diameter card for some species. */
+export interface PoleCard {
+  name: string; // "Stella-Jones red cedar, July 2026"
+  species: SpeciesCode[];
+  /** Rows, smallest diameter first. A tree uses the largest row its 6 ft diameter meets. */
+  rows: PoleCardRow[];
+  /** Cut length minus sold (nominal) length, feet: a 43 ft cut is sold as a 40 ft pole when 3. */
+  trimFt: number;
+}
+
+/** Pole spec. Species with a buyer card are judged by the card; others by the classes. */
 export interface PoleSpec {
   species: SpeciesCode[];
   minLengthM: number;
@@ -126,6 +198,8 @@ export interface PoleSpec {
   minBranchiness: Scale;
   /** Pole classes, best first. A tree gets the first class it satisfies. */
   classes: PoleClassRule[];
+  /** Buyer cards by species (e.g. Stella-Jones red cedar). */
+  cards?: PoleCard[];
 }
 
 export interface PoleClassRule {
@@ -134,15 +208,42 @@ export interface PoleClassRule {
   minLengthM: number;
 }
 
+/**
+ * A pole price band by pole length, as pole buyers quote it ("$340/m³ for 45-60 ft").
+ * Pole length is the tree's marketable height rounded DOWN to a whole 5 ft
+ * (poles are cut in 5 ft steps), so a 63 ft stem makes a 60 ft pole.
+ */
+export interface PoleLengthTier {
+  /** Shortest pole length in this band, feet (inclusive). */
+  minFt: number;
+  /** Longest pole length in this band, feet (inclusive). null = no upper limit ("65 ft+"). */
+  maxFt: number | null;
+  /** $ per m³ of gross volume. */
+  pricePerM3: number;
+}
+
 export interface Scenario {
   id: string;
   name: string; // "Nov prices", "strict pole spec"
-  /** $ per pole by class name and length bucket: price = perPiece[class] + perMetre[class] * length. */
-  polePrices: Record<string, { perPiece: number; perMetre: number }>;
-  /** $ per m³ for sawlog by species. */
+  /** $ per m³ (gross volume) for poles, by pole class name. Empty until prices are entered. */
+  polePricePerM3: Record<string, number>;
+  /** $ per m³ (net volume) for sawlog by species. Empty until prices are entered. */
   sawlogPricePerM3: Partial<Record<SpeciesCode, number>>;
+  /**
+   * Pole $/m³ by pole length (feet). When set, a pole-spec tree is priced by the band
+   * its pole length falls in; a tree too short for every band is valued as sawlog.
+   * Bands win over polePricePerM3 (by class), which stays as the fallback when empty.
+   */
+  poleLengthTiers?: PoleLengthTier[];
   poleSpec: PoleSpec;
-  /** Volume equation coefficients by species, V = a * DBH(cm)^b * H(m)^c (m³). */
+  /** BC BEC zone for the Kozak taper volume equations (e.g. "ICH", "IDF", "SBS"). Default ICH. */
+  becZone?: string;
+  /** Marketable top diameter, inside-bark cm, that spoken heights run to. Default 15 (about 6 inches). */
+  topDibCm?: number;
+  /**
+   * Optional per-species override, V = a * DBH(cm)^b * H(m)^c (m³). Species not
+   * listed use the BC Kozak taper equations.
+   */
   volumeCoefficients?: Partial<Record<SpeciesCode, { a: number; b: number; c: number }>>;
   /** Fraction of volume deducted when defects are recorded (0..1). */
   defectDeduction: number;
@@ -154,14 +255,37 @@ export interface PoleEvaluation {
   poleClass: string | null;
   /** Human readable reasons the tree failed, empty if eligible. */
   reasons: string[];
+  /** Buyer-card result for card species (6 ft diameter, longest cut length, pole volume). */
+  card?: {
+    cutLengthFt: number | null;
+    poleLengthFt: number | null;
+    diam6FtIn: number;
+    topIn: number | null;
+    poleM3: number;
+    reasons: string[];
+  } | null;
 }
 
 export interface TreeValuation {
   treeId: string;
   product: 'pole' | 'sawlog' | 'none'; // none = voided, leave tree, or missing data
   poleClass: string | null;
+  /** Sold pole length in feet, for poles (from the buyer card, else marketable height rounded down to 5 ft). */
+  poleLengthFt?: number | null;
+  /** Cut length in feet when a buyer card was used (sold length + trim). */
+  cutLengthFt?: number | null;
+  /** Estimated diameter 6 ft up from the butt, inches over bark (buyer-card species). */
+  diam6FtIn?: number | null;
+  /** Volume above the pole top to the marketable top, m³, valued at the sawlog $/m³. */
+  topM3?: number;
+  /** Why the tree is not a pole, when it was checked against the pole spec. */
+  notPoleReasons?: string[];
+  /** $/m³ used for this tree's value, null when not set. */
+  pricePerM3?: number | null;
   volumeM3: number;
   value: number; // dollars
+  /** False when the $/m³ for this tree's product is not set; value is then 0. */
+  priced: boolean;
 }
 
 export interface AreaSummary {
@@ -174,6 +298,13 @@ export interface AreaSummary {
   sawlogValue: number;
   totalValue: number;
   leaveTreeCount: number;
+  sawlogCount: number;
+  /** Gross volume of pole trees, m³. */
+  poleM3: number;
+  /** Net sawlog volume, m³. */
+  sawlogM3: number;
+  /** Pole or sawlog trees whose $/m³ is not set (their value counts as 0). */
+  unpricedCount: number;
 }
 
 /** Result of parsing one spoken utterance. */
@@ -188,7 +319,7 @@ export interface ParseResult {
   confidence: number;
 }
 
-export type VoiceCommand = 'save' | 'repeat' | 'undo' | 'measure_height' | 'cancel' | 'new_tree';
+export type VoiceCommand = 'save' | 'repeat' | 'undo' | 'measure_height' | 'cancel' | 'new_tree' | 'photo';
 
 /** Sync wire format. */
 export interface SyncPushRequest {

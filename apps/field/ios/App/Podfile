@@ -1,0 +1,36 @@
+require_relative '../../../../node_modules/.pnpm/@capacitor+ios@7.6.9_@capacitor+core@7.6.9/node_modules/@capacitor/ios/scripts/pods_helpers'
+
+platform :ios, '15.0'
+use_frameworks!
+
+# workaround to avoid Xcode caching of Pods that requires
+# Product -> Clean Build Folder after new Cordova plugins installed
+# Requires CocoaPods 1.6 or newer
+install! 'cocoapods', :disable_input_output_paths => true
+
+def capacitor_pods
+  pod 'Capacitor', :path => '../../../../node_modules/.pnpm/@capacitor+ios@7.6.9_@capacitor+core@7.6.9/node_modules/@capacitor/ios'
+  pod 'CapacitorCordova', :path => '../../../../node_modules/.pnpm/@capacitor+ios@7.6.9_@capacitor+core@7.6.9/node_modules/@capacitor/ios'
+  pod 'CapacitorCommunitySpeechRecognition', :path => '../../../../node_modules/.pnpm/@capacitor-community+speech-recognition@7.0.1_@capacitor+core@7.6.9/node_modules/@capacitor-community/speech-recognition'
+  pod 'CapacitorCommunitySqlite', :path => '../../../../node_modules/.pnpm/@capacitor-community+sqlite@7.0.3_@capacitor+core@7.6.9/node_modules/@capacitor-community/sqlite'
+  pod 'CapacitorCommunityTextToSpeech', :path => '../../../../node_modules/.pnpm/@capacitor-community+text-to-speech@6.1.0_@capacitor+core@7.6.9/node_modules/@capacitor-community/text-to-speech'
+  pod 'CapacitorCamera', :path => '../../../../node_modules/.pnpm/@capacitor+camera@7.0.5_@capacitor+core@7.6.9/node_modules/@capacitor/camera'
+  pod 'CapacitorFilesystem', :path => '../../../../node_modules/.pnpm/@capacitor+filesystem@7.1.9_@capacitor+core@7.6.9/node_modules/@capacitor/filesystem'
+  pod 'CapacitorGeolocation', :path => '../../../../node_modules/.pnpm/@capacitor+geolocation@7.1.8_@capacitor+core@7.6.9/node_modules/@capacitor/geolocation'
+  pod 'CapacitorPreferences', :path => '../../../../node_modules/.pnpm/@capacitor+preferences@7.0.4_@capacitor+core@7.6.9/node_modules/@capacitor/preferences'
+end
+
+target 'App' do
+  capacitor_pods
+  # Add your Pods here
+end
+
+post_install do |installer|
+  assertDeploymentTarget(installer)
+  # Current Xcode refuses targets below iOS 15; keep every pod in step with the app.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
+end
