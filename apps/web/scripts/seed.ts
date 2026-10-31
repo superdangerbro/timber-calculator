@@ -3,7 +3,7 @@
 // WARNING: wipes existing data in DATABASE_URL.
 import './env';
 import { sql as dsql } from 'drizzle-orm';
-import { DEFAULT_SCENARIO, formatTag, makeEvent, polygonAreaHa, uuid, type Scenario, type SpeciesCode, type TreeEvent, type TreeFields } from '@timber/core';
+import { DEFAULT_SCENARIO, poleFaultsIn, formatTag, makeEvent, polygonAreaHa, uuid, type Scenario, type SpeciesCode, type TreeEvent, type TreeFields } from '@timber/core';
 import { createDb, type DB } from '../src/db';
 import { scenarios } from '../src/db/schema';
 import { appendWebEvent, pushEvents } from '../src/lib/server/sync';
@@ -66,6 +66,8 @@ function makeFields(leave: boolean): TreeFields {
     straightness: score(good), twist: score(good + 0.1), branchiness: score(good - 0.05),
   };
   if (rand() < 0.14) f.defects = DEFECTS[Math.floor(rand() * DEFECTS.length)];
+  const faults = f.defects ? poleFaultsIn(f.defects) : [];
+  if (faults.length) f.poleFaults = faults;
   if (leave) { f.leaveTree = true; f.notes = pick([['wildlife tree', 2], ['seed tree', 3], ['riparian reserve', 1]]); }
   else if (rand() < 0.1) { const n = NOTES[Math.floor(rand() * NOTES.length)]; if (n) f.notes = n; }
   return f;
@@ -159,9 +161,10 @@ async function main() {
     await appendWebEvent(db, sam.id, joeTrees[3].treeId, 'update', { fields: { dbhCm: 46, notes: 'DBH re-taped in office review' } });
     await appendWebEvent(db, joe.id, joeTrees[8].treeId, 'update', { fields: { straightness: 5 } });
 
-    // The default has no prices (Joe enters his own $/m³). The other two carry made-up demo
-    // numbers so the what-if tools can be tried; they are labelled as such.
-    const base: Scenario = { ...DEFAULT_SCENARIO, id: uuid(), name: 'No prices set', updatedAt: new Date().toISOString() };
+    // The default carries Joe's real pole buyer prices ($/m³ by length) and no sawlog prices.
+    // The other two add made-up demo sawlog numbers so the what-if tools can be tried;
+    // they are labelled as such.
+    const base: Scenario = { ...DEFAULT_SCENARIO, id: uuid(), name: 'Pole buyer prices', updatedAt: new Date().toISOString() };
     const demoPrices = {
       polePricePerM3: { 'Class 1': 260, 'Class 2': 230, 'Class 3': 200, 'Class 4': 170 },
       sawlogPricePerM3: { FD: 95, LW: 90, PL: 70, SX: 75, CW: 140, PY: 80, BL: 55, HW: 60, AT: 30, EP: 30, AC: 25 },
@@ -171,7 +174,7 @@ async function main() {
       poleSpec: { ...base.poleSpec, minStraightness: 5, minTwist: 5, minBranchiness: 4 },
     };
     const nov: Scenario = { ...base, ...demoPrices, id: uuid(), name: 'Demo prices (made up)' };
-    // The phone follows the most recently updated scenario, so the no-prices one is newest.
+    // The phone follows the most recently updated scenario, so the real-prices one is newest.
     const older = new Date(Date.now() - 60_000).toISOString();
     strict.updatedAt = older;
     nov.updatedAt = older;

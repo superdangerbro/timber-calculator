@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Tree } from '@timber/core';
+import { poleFaultLabels, type Tree } from '@timber/core';
 import { useApp } from '../app';
 import { useEmitter } from '../lib/emitter';
 import { girthText, heightText } from '../lib/units';
@@ -63,9 +63,40 @@ export function TreeCard({ tree, onClose }: { tree: Tree; onClose: () => void })
           {sc(live.straightness)} / {sc(live.twist)} / {sc(live.branchiness)}
         </dd>
         <dt>Product</dt>
-        <dd>{v.product === 'pole' ? `Pole ${v.poleClass?.replace('Class ', 'C') ?? ''}` : v.product === 'sawlog' ? 'Sawlog' : '—'}</dd>
+        <dd data-testid="card-product">{v.product === 'pole' ? (v.poleLengthFt ? `Pole · ${v.poleLengthFt} ft` : `Pole ${v.poleClass?.replace('Class ', 'C') ?? ''}`) : v.product === 'sawlog' ? 'Sawlog' : '—'}</dd>
+        {v.cutLengthFt ? (
+          <>
+            <dt>Pole cut</dt>
+            <dd data-testid="card-cut">{v.cutLengthFt} ft{v.diam6FtIn ? ` · ${v.diam6FtIn.toFixed(1)}″ at 6 ft` : ''}</dd>
+          </>
+        ) : v.diam6FtIn ? (
+          <>
+            <dt>At 6 ft</dt>
+            <dd>{v.diam6FtIn.toFixed(1)}″ over bark</dd>
+          </>
+        ) : null}
+        {v.product === 'sawlog' && v.notPoleReasons?.some((r) => !/not recorded|not in pole spec/.test(r)) ? (
+          <>
+            <dt>Not a pole</dt>
+            <dd className="dim" data-testid="card-notpole">{v.notPoleReasons.filter((r) => !/not recorded|not in pole spec/.test(r)).join('; ')}</dd>
+          </>
+        ) : null}
+        {live.poleFaults?.length ? (
+          <>
+            <dt>Pole faults</dt>
+            <dd data-testid="card-faults">{poleFaultLabels(live.poleFaults).join(', ')}</dd>
+          </>
+        ) : null}
+        {v.product !== 'none' && v.pricePerM3 ? (
+          <>
+            <dt>Price</dt>
+            <dd data-testid="card-price">${v.pricePerM3}/m³</dd>
+          </>
+        ) : null}
         <dt>Volume</dt>
-        <dd>{v.volumeM3.toFixed(2)} m³</dd>
+        <dd>
+          {v.volumeM3.toFixed(2)} m³{v.topM3 && v.topM3 >= 0.01 ? ` pole + ${v.topM3.toFixed(2)} m³ top as sawlog` : ''}
+        </dd>
         <dt>Value</dt>
         <dd data-testid="card-value">{v.product === 'none' ? '—' : v.priced ? money(v.value) : <span className="dim">prices not set</span>}</dd>
         <dt>Status</dt>

@@ -1,5 +1,5 @@
 import { customType } from 'drizzle-orm/pg-core';
-import type { TreePhoto } from '@timber/core';
+import type { TreePhoto, PoleFault } from '@timber/core';
 import {
   pgTable, uuid, text, timestamp, integer, bigserial, jsonb, doublePrecision, boolean, index, uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -70,6 +70,7 @@ export const trees = pgTable('trees', {
   twist: integer('twist'),
   branchiness: integer('branchiness'),
   defects: text('defects'),
+  poleFaults: jsonb('pole_faults').$type<PoleFault[]>(),
   leaveTree: boolean('leave_tree'),
   notes: text('notes'),
   stumpDiameterCm: doublePrecision('stump_diameter_cm'),

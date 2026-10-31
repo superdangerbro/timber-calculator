@@ -92,7 +92,7 @@ describe('export', () => {
   it('CSV with scenario adds valuation', () => {
     const csv = toCsv(trees, DEFAULT_SCENARIO);
     const [header, first] = csv.split('\r\n');
-    expect(header.endsWith('product,pole_class,volume_m3,value_cad')).toBe(true);
+    expect(header.endsWith('product,pole_class,pole_length_ft,price_per_m3,volume_m3,value_cad')).toBe(true);
     expect(first).toContain(',pole,Class 1,');
   });
   it('GeoJSON', () => {

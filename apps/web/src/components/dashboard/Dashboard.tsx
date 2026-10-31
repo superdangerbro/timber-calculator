@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
-  DEFAULT_SCENARIO, hasPrices, polygonAreaHa, speciesName, summarize, toCsv, toGeoJson, toKml, treesInArea, valueTree,
+  DEFAULT_SCENARIO, hasPrices, poleFaultLabels, polygonAreaHa, speciesName, summarize, toCsv, toGeoJson, toKml, treesInArea, valueTree,
   type Block, type Scenario, type SpeciesCode, type Tree, type TreeValuation, type UserProfile,
 } from '@timber/core';
 import { AppHeader } from '../AppHeader';
@@ -304,10 +304,15 @@ function DashboardInner({ me }: { me: Me }) {
         ${t.circumferenceCm ? `<span>Circumf.</span><b>${num(t.circumferenceCm, 1)} cm</b>` : ''}
         <span>DBH</span><b>${num(t.dbhCm, 1)} cm</b><span>Height</span><b>${num(t.heightM, 1)} m</b>
         <span>Str / Tw / Br</span><b>${sc(t.straightness)} / ${sc(t.twist)} / ${sc(t.branchiness)}</b>
-        <span>Product</span><b>${v?.product === 'pole' ? `Pole ${escapeHtml(v.poleClass ?? '')}` : v?.product === 'sawlog' ? 'Sawlog' : '—'}</b>
+        <span>Product</span><b>${v?.product === 'pole' ? (v.poleLengthFt ? `Pole · ${v.poleLengthFt} ft` : `Pole ${escapeHtml(v.poleClass ?? '')}`) : v?.product === 'sawlog' ? 'Sawlog' : '—'}</b>
+        ${v?.cutLengthFt ? `<span>Pole cut</span><b data-testid="pop-cut">${v.cutLengthFt} ft</b>` : ''}
+        ${v?.diam6FtIn ? `<span>At 6 ft</span><b>${num(v.diam6FtIn, 1)}″ o.b.</b>` : ''}
+        ${v && v.product !== 'none' && v.pricePerM3 ? `<span>Price</span><b data-testid="pop-price">$${num(v.pricePerM3, 0)}/m³</b>` : ''}
         <span>Volume</span><b>${num(v?.volumeM3 ?? 0, 2)} m³</b><span>Value</span>${!v || v.product === 'none' ? '<b class="muted">—</b>' : !v.priced ? '<b class="muted">prices not set</b>' : `<b class="money">${money(v.value)}</b>`}
         <span>Status</span><b>${escapeHtml(t.status)}</b>
       </div>
+      ${t.poleFaults?.length ? `<div class="pop-note" data-testid="pop-faults">Pole faults: ${escapeHtml(poleFaultLabels(t.poleFaults).join(', '))}</div>` : ''}
+      ${v?.product === 'sawlog' && v.notPoleReasons?.some((r) => !/not recorded|not in pole spec|pole fault/.test(r)) ? `<div class="pop-note">Not a pole: ${escapeHtml(v.notPoleReasons.filter((r) => !/not recorded|not in pole spec|pole fault/.test(r)).join('; '))}</div>` : ''}
       ${t.defects ? `<div class="pop-note">Defects: ${escapeHtml(t.defects)}</div>` : ''}
       ${t.notes ? `<div class="pop-note">${escapeHtml(t.notes)}</div>` : ''}
       ${movedText(t) ? `<div class="pop-moved" data-testid="pop-moved">Location adjusted by hand (${escapeHtml(movedText(t)!)})</div>` : ''}

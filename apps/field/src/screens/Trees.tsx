@@ -228,7 +228,7 @@ export function TreesScreen() {
                 </div>
               </div>
               <div className="tr-value">
-                <div className={`prod ${v.product}`}>{v.product === 'pole' ? v.poleClass ?? 'Pole' : v.product === 'none' ? '—' : 'Sawlog'}</div>
+                <div className={`prod ${v.product}`}>{v.product === 'pole' ? (v.poleLengthFt ? `Pole ${v.poleLengthFt}′` : v.poleClass ?? 'Pole') : v.product === 'none' ? '—' : 'Sawlog'}</div>
                 <div className="tr-money">
                   {t.voided ? 'void' : v.product === 'none' ? '—' : v.priced ? money(v.value) : `${v.volumeM3.toFixed(2)} m³`}
                   {t.photos?.length ? <Icon name="camera" size={16} /> : null}

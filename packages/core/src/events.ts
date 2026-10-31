@@ -123,7 +123,7 @@ export async function verifyChain(events: TreeEvent[]): Promise<{ ok: boolean; b
 }
 
 const FIELD_KEYS: (keyof TreeFields)[] = [
-  'species', 'dbhCm', 'circumferenceCm', 'heightM', 'heightSource', 'straightness', 'twist', 'branchiness', 'defects', 'leaveTree', 'notes',
+  'species', 'dbhCm', 'circumferenceCm', 'heightM', 'heightSource', 'straightness', 'twist', 'branchiness', 'defects', 'poleFaults', 'leaveTree', 'notes',
 ];
 
 function applyFields(tree: Tree, fields: unknown) {

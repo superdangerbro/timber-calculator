@@ -40,7 +40,7 @@ function watch(page, label) {
 }
 
 async function login(page) {
-  await page.goto(`${BASE}/login`);
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
   await page.fill('#email', 'joe@example.com');
   await page.fill('#password', 'timber123');
   await Promise.all([page.waitForURL(`${BASE}/`), page.click('button[type=submit]')]);
@@ -132,13 +132,18 @@ async function desktop(browser) {
   const areaOpt = await page.$eval('[data-testid=area-select]', (s) => s.selectedOptions[0]?.textContent);
   check('save drawn area as block', /Smoke test unit/.test(areaOpt ?? ''), areaOpt);
 
-  // Default scenario has no prices: values read "not set", volumes still show.
-  const noPrice = await totalValue(page);
-  const hint = await page.$('[data-testid=price-hint]');
-  const dash = await page.locator('[data-testid=tree-row] td').filter({ hasText: /^—$/ }).count();
-  check('no prices: totals say "Prices not set", table shows — not $0', /Prices not set/.test(noPrice) && !!hint && dash > 0, `${noPrice}; ${dash} dash cells`);
+  // Default scenario carries the pole buyer's $/m³ by length and no sawlog prices:
+  // poles show dollars, sawlogs show — (not $0).
+  const poleTotal = await totalValue(page);
+  const poleRow = page.locator('[data-testid=tree-row]').filter({ has: page.locator('.badge.pole') }).first();
+  const poleCells = await poleRow.locator('td').allTextContents();
+  const sawRow = page.locator('[data-testid=tree-row]').filter({ has: page.locator('.badge.sawlog') }).first();
+  const sawValue = (await sawRow.locator('td').allTextContents()).join('|');
+  check('pole buyer prices: poles valued by length, sawlogs unpriced',
+    /^\$/.test(poleTotal) && poleCells.some((c) => /^(300|340|500)$/.test(c)) && poleCells.some((c) => /^\$/.test(c)) && !/\$\d/.test(sawValue),
+    `${poleTotal}; pole row ${poleCells.filter(Boolean).slice(0, 14).join(' ')}`);
   fs.mkdirSync(V2, { recursive: true });
-  await page.screenshot({ path: `${V2}/web-01-no-prices-1440.png` });
+  await page.screenshot({ path: `${V2}/web-01-pole-buyer-prices-1440.png` });
   // Switch to the demo-priced scenario for the value checks below.
   const demoId = await page.$eval('[data-testid=scenario-select]', (sel) => [...sel.options].find((o) => o.textContent === 'Demo prices (made up)')?.value);
   await page.selectOption('[data-testid=scenario-select]', demoId);
@@ -182,7 +187,7 @@ async function desktop(browser) {
 
   // Pricing what-if.
   const tvBefore = await totalValue(page);
-  await page.fill('[data-testid="pole-m3-Class 1"]', '900');
+  await page.fill('[data-testid=tier-price-2]', '900');
   await page.fill('[data-testid=saw-FD]', '150');
   await page.waitForTimeout(300);
   const tvAfter = await totalValue(page);

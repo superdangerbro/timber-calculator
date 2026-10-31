@@ -34,7 +34,7 @@ export function rowToTree(r: TreeRow): Tree {
     circumferenceCm: nn(r.circumferenceCm), photos: nn(r.photos) ?? undefined, heightM: nn(r.heightM),
     heightSource: nn(r.heightSource) as Tree['heightSource'],
     straightness: nn(r.straightness) as Scale | undefined, twist: nn(r.twist) as Scale | undefined,
-    branchiness: nn(r.branchiness) as Scale | undefined, defects: nn(r.defects), leaveTree: nn(r.leaveTree),
+    branchiness: nn(r.branchiness) as Scale | undefined, defects: nn(r.defects), poleFaults: nn(r.poleFaults) ?? undefined, leaveTree: nn(r.leaveTree),
     notes: nn(r.notes), stumpDiameterCm: r.stumpDiameterCm, createdBy: r.createdBy, deviceId: r.deviceId,
     createdAt: r.createdAt, updatedAt: r.updatedAt, version: r.version,
   };
@@ -50,7 +50,7 @@ export function treeToRow(t: Tree): typeof schema.trees.$inferInsert {
     species: t.species ?? null, dbhCm: t.dbhCm ?? null,
     circumferenceCm: t.circumferenceCm ?? null, photos: t.photos?.length ? t.photos : null, heightM: t.heightM ?? null, heightSource: t.heightSource ?? null,
     straightness: t.straightness ?? null, twist: t.twist ?? null, branchiness: t.branchiness ?? null,
-    defects: t.defects ?? null, leaveTree: t.leaveTree ?? null, notes: t.notes ?? null,
+    defects: t.defects ?? null, poleFaults: t.poleFaults?.length ? t.poleFaults : null, leaveTree: t.leaveTree ?? null, notes: t.notes ?? null,
     stumpDiameterCm: t.stumpDiameterCm ?? null, createdBy: t.createdBy, deviceId: t.deviceId,
     createdAt: t.createdAt, updatedAt: t.updatedAt, version: t.version ?? 1,
   };

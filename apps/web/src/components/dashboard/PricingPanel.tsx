@@ -1,5 +1,6 @@
 'use client';
-import { hasPrices, BEC_ZONES, DEFAULT_BEC_ZONE, DEFAULT_TOP_DIB_CM, SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
+import { useEffect, useState } from 'react';
+import { hasPrices, tierLabel, BEC_ZONES, DEFAULT_BEC_ZONE, DEFAULT_TOP_DIB_CM, SPECIES, SPECIES_COLORS, type AreaSummary, type Scale, type Scenario, type SpeciesCode } from '@timber/core';
 import { money, signed } from '@/lib/format';
 
 /** Set or clear one $/m³ entry (an empty box means "not set", not $0). */
@@ -8,6 +9,16 @@ function setPrice<K extends string>(map: Partial<Record<K, number>>, key: K, raw
   if (raw.trim() === '') delete next[key];
   else next[key] = Math.max(0, Number(raw));
   return next;
+}
+
+/** Cut lengths as "108 103 98" text; parsed on blur. */
+function LengthsInput({ value, onChange, label }: { value: number[]; onChange: (v: number[]) => void; label: string }) {
+  const [text, setText] = useState(value.join(' '));
+  useEffect(() => setText(value.join(' ')), [value]);
+  return (
+    <input className="input" value={text} aria-label={label} onChange={(e) => setText(e.target.value)}
+      onBlur={() => onChange(text.split(/[^0-9.]+/).filter(Boolean).map(Number).filter((x) => x > 0).sort((a, b) => b - a))} />
+  );
 }
 
 export function PricingPanel({
@@ -22,6 +33,9 @@ export function PricingPanel({
   const setSpec = (patch: Partial<Scenario['poleSpec']>) => onChange({ ...scenario, poleSpec: { ...spec, ...patch } });
   const n = (v: string) => (v === '' ? 0 : Math.max(0, Number(v)));
   const compareName = saved.find((s) => s.id === compareId)?.name;
+  const tiers = scenario.poleLengthTiers ?? [];
+  const setTier = (i: number, patch: Partial<(typeof tiers)[number]>) =>
+    onChange({ ...scenario, poleLengthTiers: tiers.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
 
   return (
     <aside className="pricing" data-testid="pricing-panel" aria-label="What-if pricing">
@@ -79,8 +93,32 @@ export function PricingPanel({
         {!hasPrices(scenario) && (
           <p className="price-hint" data-testid="price-hint">Enter your $/m³ below. Until then the app shows volumes and pole/sawlog counts only.</p>
         )}
-        <details className="pgroup" open>
-          <summary>Pole $/m³ <span className="muted">(gross volume, by class)</span></summary>
+        <details className="pgroup" open data-testid="pole-tiers">
+          <summary>Pole $/m³ by length <span className="muted">(gross volume)</span></summary>
+          <p className="muted small">Cedar: the pole card below sets the length. Other species: marketable height rounded down to 5 ft. Trees that pass the pole spec but are shorter than every band are valued as sawlog.</p>
+          <table className="ptable tiers">
+            <thead><tr><th>From ft</th><th>To ft</th><th>$/m³</th><th /></tr></thead>
+            <tbody>
+              {tiers.map((t, i) => (
+                <tr key={i} data-testid={`tier-${i}`}>
+                  <td><input className="input" type="number" min={0} step={5} value={t.minFt} aria-label={`Band ${i + 1} from feet`} data-testid={`tier-min-${i}`}
+                    onChange={(e) => setTier(i, { minFt: n(e.target.value) })} /></td>
+                  <td><input className="input" type="number" min={0} step={5} value={t.maxFt ?? ''} placeholder="+" aria-label={`Band ${i + 1} to feet (blank = and up)`} data-testid={`tier-max-${i}`}
+                    onChange={(e) => setTier(i, { maxFt: e.target.value === '' ? null : n(e.target.value) })} /></td>
+                  <td><input className="input" type="number" min={0} value={t.pricePerM3 || ''} placeholder="$/m³" aria-label={`Band ${i + 1} price per cubic metre`} data-testid={`tier-price-${i}`}
+                    onChange={(e) => setTier(i, { pricePerM3: n(e.target.value) })} /></td>
+                  <td><button type="button" className="btn ghost small" aria-label={`Remove band ${tierLabel(t)}`} title="Remove band"
+                    onClick={() => onChange({ ...scenario, poleLengthTiers: tiers.filter((_, j) => j !== i) })}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" className="btn small" data-testid="tier-add"
+            onClick={() => onChange({ ...scenario, poleLengthTiers: [...tiers, { minFt: tiers.length ? (tiers[tiers.length - 1].maxFt ?? tiers[tiers.length - 1].minFt) + 5 : 35, maxFt: null, pricePerM3: 0 }] })}>+ Add band</button>
+        </details>
+
+        <details className="pgroup" open={tiers.length === 0}>
+          <summary>Pole $/m³ by class <span className="muted">{tiers.length ? '(not used while length bands are set)' : '(gross volume)'}</span></summary>
           <div className="saw-grid">
             {spec.classes.map((c) => (
               <label key={c.name} className="saw-item" title={`${c.name}: DBH ≥ ${c.minDbhCm} cm, length ≥ ${c.minLengthM} m`}>
@@ -124,6 +162,39 @@ export function PricingPanel({
           </label>
         </details>
 
+        {(spec.cards ?? []).map((card, ci) => {
+          const setCard = (patch: Partial<typeof card>) =>
+            setSpec({ cards: (spec.cards ?? []).map((c, j) => (j === ci ? { ...c, ...patch } : c)) });
+          const setRow = (ri: number, patch: Partial<(typeof card.rows)[number]>) =>
+            setCard({ rows: card.rows.map((r, j) => (j === ri ? { ...r, ...patch } : r)) });
+          return (
+            <details key={ci} className="pgroup" data-testid={`pole-card-${ci}`}>
+              <summary>Pole card: {card.name} <span className="muted">({card.species.join(', ')})</span></summary>
+              <p className="muted small">From each tree's DBH and marketable height the BC taper equation estimates the diameter 6 ft above the butt (over bark). The tree uses the last row it meets and makes the longest length whose top is at least the minimum top. Sold length = cut length − trim, which picks the $/m³ band.</p>
+              <label className="row between deduct">
+                <span>Trim allowance</span>
+                <span className="row"><input className="input" type="number" min={0} max={20} value={card.trimFt} data-testid="card-trim"
+                  onChange={(e) => setCard({ trimFt: n(e.target.value) })} aria-label="Trim allowance feet" />&nbsp;ft</span>
+              </label>
+              <table className="ptable card-table">
+                <thead><tr><th>6 ft dia ≥ in</th><th>Cut lengths ft</th><th>Min top in</th></tr></thead>
+                <tbody>
+                  {card.rows.map((r, ri) => (
+                    <tr key={ri} data-testid={`card-row-${ri}`}>
+                      <td><input className="input" type="number" min={0} value={r.minDiam6FtIn} aria-label={`Row ${ri + 1} minimum diameter at 6 ft`}
+                        onChange={(e) => setRow(ri, { minDiam6FtIn: n(e.target.value) })} /></td>
+                      <td><LengthsInput value={r.lengthsFt} onChange={(lengthsFt) => setRow(ri, { lengthsFt })} label={`Row ${ri + 1} cut lengths`} /></td>
+                      <td><input className="input" type="number" min={0} value={r.minTopIn} aria-label={`Row ${ri + 1} minimum top`}
+                        onChange={(e) => setRow(ri, { minTopIn: n(e.target.value) })} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="muted small">Faults that knock a tree out of pole grade are ticked per tree on the phone: damage over 1", splits/cracks, butt or top rot, bark seams over 2", spike knots/burls, shake in the outer 2", excess sweep.</p>
+            </details>
+          );
+        })}
+
         <details className="pgroup">
           <summary>Pole spec thresholds</summary>
           <div className="spec-species">
@@ -138,7 +209,7 @@ export function PricingPanel({
             })}
           </div>
           <div className="spec-mins">
-            <label>Min length m<input className="input" type="number" min={0} value={spec.minLengthM} onChange={(e) => setSpec({ minLengthM: n(e.target.value) })} /></label>
+            <label>Min length m<input className="input" type="number" min={0} step={0.01} value={spec.minLengthM} onChange={(e) => setSpec({ minLengthM: n(e.target.value) })} /></label>
             {([['minStraightness', 'Straight ≥'], ['minTwist', 'Twist ≥'], ['minBranchiness', 'Branch ≥']] as const).map(([k, l]) => (
               <label key={k}>{l}
                 <select className="select" value={spec[k]} onChange={(e) => setSpec({ [k]: Number(e.target.value) as Scale })} data-testid={`spec-${k}`}>

@@ -424,3 +424,7 @@ html:has(.report), body:has(.report) { background: #e9eeea; }
 .stat .sub.warn { color: #fbbf24; }
 .price-hint { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 107, 26, 0.12); border: 1px solid rgba(255, 107, 26, 0.45); color: #ffd3b8; font-size: 13px; }
 .pop-moved { margin-top: 6px; color: var(--orange, #ff6b1a); font-size: 12.5px; font-weight: 700; }
+.card-table { table-layout: fixed; }
+.card-table th:nth-child(1), .card-table td:nth-child(1) { width: 22%; }
+.card-table th:nth-child(3), .card-table td:nth-child(3) { width: 20%; }
+.card-table td:nth-child(2) .input { text-align: left; font-size: 11px; padding: 0 5px; letter-spacing: -0.2px; }

@@ -14,7 +14,9 @@ export function TotalsBar({ summary, areaHa, areaName, compare, compareName, cla
     compare && other !== undefined && Math.abs(cur - other) > 0.004 ? (
       <span className={`delta ${cur - other > 0 ? 'up' : 'down'}`} title={`vs ${compareName}`}>{signed(cur - other, fmt)}</span>
     ) : null;
-  const classes = classOrder.map((c) => [c, summary.polesByClass[c] ?? 0] as const).filter(([, n]) => n > 0);
+  // Spec classes first, then buyer-card lengths ("75 ft"), longest first.
+  const extra = Object.keys(summary.polesByClass).filter((c) => !classOrder.includes(c)).sort((a, b) => parseFloat(b) - parseFloat(a));
+  const classes = [...classOrder, ...extra].map((c) => [c, summary.polesByClass[c] ?? 0] as const).filter(([, n]) => n > 0);
 
   return (
     <section className="totals" data-testid="totals" aria-label="Area totals">

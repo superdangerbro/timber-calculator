@@ -509,7 +509,7 @@ try {
   });
   assert(Math.max(dims.w, dims.h) <= 1280, `photo shrunk to <= 1280 px, got ${dims.w}x${dims.h}`);
   const cardText = (await tid('tree-card').textContent()).replace(/\s+/g, ' ');
-  assert(/75 in/.test(cardText) && /23\.9 in/.test(cardText) && /98 ft/.test(cardText) && /prices not set/.test(cardText), `card: ${cardText}`);
+  assert(/75 in/.test(cardText) && /23\.9 in/.test(cardText) && /98 ft/.test(cardText) && /Pole · 95 ft/.test(cardText) && /\$500\/m³/.test(cardText), `card: ${cardText}`);
   log(`Info card OK, photo ${dims.w}x${dims.h}`);
   await shot2('field-04-info-card-photo');
   await tid('photo-thumb').first().click();
@@ -518,9 +518,9 @@ try {
   await tid('photo-viewer').click();
   await page.locator('[data-testid=tree-card] .icon-btn[aria-label=Close]').click();
 
-  // Totals without prices show volume, not dollars.
-  assert(await tid('totals-volume').count(), 'totals show m³ when no prices');
-  await shot2('field-06-totals-no-prices');
+  // Pole buyer prices are built in, so the day's totals show dollars.
+  assert(/\$[\d,]+/.test(await tid('totals-value').textContent()), 'totals show $ with the pole buyer prices');
+  await shot2('field-06-totals-priced');
 
   // Tree editor: circumference field and derived DBH; stored metric.
   await tid('tab-trees').click();

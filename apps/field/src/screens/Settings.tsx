@@ -4,6 +4,7 @@ import { useApp } from '../app';
 import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
 import { shareFile } from '../lib/exporter';
+import { PriceSettings } from '../components/PriceSettings';
 import { isToday } from '../state/repo';
 import type { Settings } from '../state/settings';
 
@@ -178,6 +179,11 @@ export function SettingsScreen() {
             ? `Say "circ ${st.units === 'imperial' ? 'seventy five' : 'one ninety'}" or just the number; DBH is worked out (C ÷ π). "DBH 24" still works.`
             : `Say "${st.units === 'imperial' ? 'twenty four' : 'sixty'}" or "DBH ..."; "circumference ..." also works.`}
         </p>
+      </section>
+
+      <section className="set-section" data-testid="prices-section">
+        <h2>Prices</h2>
+        <PriceSettings scenario={repo.scenario} onSave={(sc) => void save({ scenario: sc })} />
       </section>
 
       <section className="set-section">

@@ -1,5 +1,6 @@
 import {
   DEFAULT_SCENARIO,
+  normalizeScenario,
   foldAll,
   formatTag,
   makeEvent,
@@ -150,11 +151,20 @@ export class Repo extends Emitter<RepoState> {
     return p;
   }
 
+  private normalizedFrom: Scenario | null = null;
+  private normalized: Scenario | null = null;
+
   get settings() {
     return this.state.settings;
   }
   get scenario(): Scenario {
-    return this.state.settings.scenario ?? DEFAULT_SCENARIO;
+    const sc = this.state.settings.scenario;
+    if (!sc) return DEFAULT_SCENARIO;
+    if (this.normalizedFrom !== sc) {
+      this.normalizedFrom = sc;
+      this.normalized = normalizeScenario(sc as Scenario & Record<string, unknown>);
+    }
+    return this.normalized!;
   }
   get userId() {
     const st = this.state.settings;

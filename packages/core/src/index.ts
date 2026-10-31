@@ -2,10 +2,11 @@
 // apps/web and apps/field; implementations live in the sibling modules.
 export * from './types';
 export { SPECIES, SPECIES_COLORS, speciesByCode, speciesName } from './species';
-export { parseUtterance, mergeDraft, missingFields, REQUIRED_FIELDS, type ParseOptions } from './parser';
+export { parseUtterance, poleFaultsIn, mergeDraft, missingFields, REQUIRED_FIELDS, type ParseOptions } from './parser';
 export { readbackText, tagSpeech, speakGirth, speakHeight, type ReadbackOptions } from './readback';
 export { formatTag, nextTagNumber } from './tags';
 export { evaluatePole } from './pole';
+export { POLE_FAULTS, STELLA_JONES_CEDAR_2026, cardFor, longestPole, poleFaultLabels, type CardResult } from './poleCard';
 export { treeVolumeM3, DEFAULT_VOLUME_COEFFICIENTS } from './volume';
 export type { VolumeCoefficients, VolumeOptions } from './volume';
 export {
@@ -20,7 +21,7 @@ export {
   totalHeightFromMerch,
 } from './taper';
 export type { BecZone, KozakTreeVolume } from './taper';
-export { valueTree, summarize, hasPrices, normalizeScenario, DEFAULT_SCENARIO } from './value';
+export { valueTree, summarize, hasPrices, normalizeScenario, DEFAULT_SCENARIO, POLE_BUYER_TIERS, poleLengthFt, poleTierFor, tierLabel } from './value';
 export { averageFixes } from './gps';
 export { heightFromAngles } from './clinometer';
 export { canonicalJson, hashEvent, verifyChain, makeEvent, foldEvents, foldAll } from './events';

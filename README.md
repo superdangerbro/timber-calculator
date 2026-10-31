@@ -63,11 +63,18 @@ Measuring switches to DBH and/or metric). Units only change what is shown and re
 everything is stored metric (`circumference_cm`, `dbh_cm` = C / pi, `height_m`), and DBH can
 still be spoken directly.
 
-**Pricing.** There are no built-in prices. The default scenario is "No prices set", so the
-dashboard and phone show m³ and pole/sawlog counts until you enter a pole $/m³ per class
-(on gross volume) and a sawlog $/m³ per species (on net volume) in What-if pricing. The seed
-adds two scenarios marked "Demo prices (made up)" for trying the what-if tools. Pole specs and
-volume settings are editable there too, and pricing never changes field measurements.
+**Pricing.** All prices are $/m³. The default scenario, "Pole buyer prices", carries Joe's
+pole buyer's prices by pole length ($300 for 35-40 ft, $340 for 45-60 ft, $500 for 65 ft and up)
+and no sawlog prices until you enter them per species. Both are editable on the phone
+(Settings > Prices) and on the dashboard (What-if pricing). Pole length for western redcedar
+comes from the Stella-Jones red cedar card (July 2026): the BC Kozak taper equation estimates
+the diameter 6 ft up from the butt (over bark) from DBH and marketable height, the tree uses the
+card row it meets, and makes the longest listed length whose top is at least that row's minimum
+top. The sold length (cut length − 3 ft trim, editable) picks the $/m³ band; the pole piece is
+valued at that band and the rest of the stem to the marketable top at the sawlog $/m³. Other
+pole species use marketable height rounded down to 5 ft. A tree too short for every band, or
+with any pole fault ticked (damage over 1", splits, rot, bark seams over 2", spike knots/burls,
+shake, excess sweep), is valued as sawlog. Pricing never changes field measurements.
 
 **Photos.** Photos are shrunk on the phone to about 1280 px JPEG (under 250 KB), kept offline,
 and uploaded on sync to `PUT /api/photos/:id` (sha-256 checked, idempotent). The tree's event

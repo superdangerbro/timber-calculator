@@ -126,7 +126,9 @@ export class SyncClient extends Emitter<SyncState> {
         for (const b of body.blocks ?? []) await this.repo.putBlock(b);
         if (body.scenarios?.length) {
           const latest = [...body.scenarios].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
-          await this.repo.saveSettings({ scenario: latest });
+          // Keep prices edited on the phone unless the office saved newer ones.
+          const local = this.repo.settings.scenario;
+          if (!local || !local.updatedAt || latest.updatedAt > local.updatedAt) await this.repo.saveSettings({ scenario: latest });
         }
         pulled += body.events?.length ?? 0;
         const next = body.cursor ?? cursor;

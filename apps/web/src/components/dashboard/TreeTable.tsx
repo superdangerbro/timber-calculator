@@ -124,6 +124,8 @@ export function TreeTable({ rows, dupTags, selectedIds, onRowClick, onToggle, on
         cell: (c) => { const r = c.row.original; return r.tree.leaveTree ? <span className="badge none">Leave</span> : <span className={`badge ${r.val.product}`}>{r.val.product === 'none' ? '—' : r.val.product === 'pole' ? 'Pole' : 'Sawlog'}</span>; },
       }),
       col.accessor((r) => r.val.poleClass ?? '', { id: 'poleClass', header: 'Class', cell: (c) => c.getValue() ? String(c.getValue()).replace('Class ', 'C') : <span className="muted">—</span> }),
+      col.accessor((r) => r.val.poleLengthFt ?? 0, { id: 'poleFt', header: 'Pole ft', meta: { align: 'r' }, cell: (c) => c.getValue() ? String(c.getValue()) : <span className="muted">—</span> }),
+      col.accessor((r) => r.val.pricePerM3 ?? 0, { id: 'pricePerM3', header: '$/m³', meta: { align: 'r' }, cell: (c) => c.getValue() ? num(c.getValue(), 0) : <span className="muted">—</span> }),
       col.accessor((r) => r.val.volumeM3, { id: 'volume', header: 'Vol m³', meta: { align: 'r' }, cell: (c) => num(c.getValue(), 2) }),
       col.accessor((r) => r.val.value, { id: 'value', header: 'Value', meta: { align: 'r' }, cell: (c) => { const v = c.row.original.val; return v.product === 'none' ? <span className="muted">—</span> : !v.priced ? <span className="muted" title="No $/m³ set for this product">—</span> : <b className="money">{money(c.getValue())}</b>; } }),
       col.accessor((r) => r.tree.status, {

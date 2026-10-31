@@ -151,7 +151,7 @@ await row.scrollIntoViewIfNeeded();
 const card = await row.textContent();
 console.log('phone row:', card.replace(/\s+/g, ' ').slice(0, 120));
 assert(/53 cm/.test(card), 'dashboard edit pulled to phone');
-assert(!/\$/.test(card), 'phone shows no dollars while the default scenario has no prices');
+assert(/Pole 100′/.test(card) && /\$[\d,]+/.test(card), 'phone values the pole with the pole buyer price bands');
 await p.screenshot({ path: `${SHOTS}/05-field-after-pull.png` });
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');

@@ -37,6 +37,8 @@ const COLUMNS: [string, (t: Tree) => unknown][] = [
 const VALUE_COLUMNS: [string, (v: TreeValuation) => unknown][] = [
   ['product', (v) => v.product],
   ['pole_class', (v) => v.poleClass],
+  ['pole_length_ft', (v) => v.poleLengthFt ?? ''],
+  ['price_per_m3', (v) => v.pricePerM3 ?? ''],
   ['volume_m3', (v) => v.volumeM3],
   ['value_cad', (v) => (v.priced ? v.value : '')],
 ];
@@ -89,6 +91,8 @@ export function toGeoJson(trees: Tree[], scenario?: Scenario): GeoJSON.FeatureCo
           const v = valueTree(t, scenario);
           props.product = v.product;
           props.poleClass = v.poleClass;
+          props.poleLengthFt = v.poleLengthFt ?? null;
+          props.pricePerM3 = v.pricePerM3 ?? null;
           props.volumeM3 = v.volumeM3;
           props.value = v.priced ? v.value : null;
         }

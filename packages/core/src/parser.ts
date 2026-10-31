@@ -8,7 +8,7 @@
 // is never interpreted twice (e.g. the 20 in "fork at twenty" belongs to the
 // defect, never to height or DBH).
 
-import type { ParseResult, Scale, SpeciesCode, TreeFields, UnitSystem, VoiceCommand } from './types';
+import type { ParseResult, PoleFault, Scale, SpeciesCode, TreeFields, UnitSystem, VoiceCommand } from './types';
 import { SPECIES } from './species';
 
 // ---------------------------------------------------------------------------
@@ -148,11 +148,13 @@ const DEFECT_SINGLE = new Set([
   'scar', 'scarred', 'scars',
   'conk', 'conks', 'conky',
   'catface', 'catfaced', 'catfaces', 'catfacing',
+  'split', 'splits', 'crack', 'cracks', 'cracked', 'shake', 'shakes', 'burl', 'burls', 'burly',
 ]);
 const DEFECT_DOUBLE: [string, string][] = [
   ['dead', 'top'], ['dead', 'tops'], ['broken', 'top'], ['broken', 'tops'], ['spike', 'top'], ['spiked', 'top'],
   ['frost', 'crack'], ['frost', 'cracks'], ['frost', 'cracked'], ['cat', 'face'], ['cat', 'faced'],
   ['cat', 'faces'], ['blown', 'top'], ['snapped', 'top'],
+  ['spike', 'knot'], ['spike', 'knots'], ['bunch', 'knot'], ['bunch', 'knots'], ['bark', 'seam'], ['bark', 'seams'],
 ];
 const DEFECT_PRE = new Set([
   'a', 'bit', 'of', 'little', 'some', 'slight', 'slightly', 'small', 'minor', 'major', 'bad', 'badly', 'heavy',
@@ -836,6 +838,8 @@ export function parseUtterance(text: string, opts: ParseOptions = {}): ParseResu
   passBareNumbers(ctx);
 
   if (ctx.defects.length) ctx.fields.defects = ctx.defects.join('; ');
+  const faults = poleFaultsIn(text ?? '');
+  if (faults.length) ctx.fields.poleFaults = faults;
   if (ctx.notes.length) ctx.fields.notes = ctx.notes.join('; ');
 
   let meaningful = 0;
@@ -860,12 +864,43 @@ export function parseUtterance(text: string, opts: ParseOptions = {}): ParseResu
  * Merge newly parsed fields onto a draft. Later values win; defects are appended ("; ").
  * A DBH given without a circumference replaces (clears) an earlier circumference.
  */
+const FAULT_RULES: [PoleFault, RegExp, RegExp][] = [
+  // [fault, phrase, words just before it that cancel it]
+  ['rot', /\b(?:rot|rotten|rotted|punky)\b/g, /\b(?:no|not|without)(?: \w+)?\s$/],
+  ['split', /\b(?:split|splits|crack|cracks|cracked)\b/g, /\b(?:no|not|without)(?: \w+)?\s$/],
+  ['shake', /\bshakes?\b/g, /\b(?:no|not|without)(?: \w+)?\s$/],
+  ['knots', /\b(?:spike knots?|bunch knots?|burls?|burly)\b/g, /\b(?:no|not|without)(?: \w+)?\s$/],
+  ['barkSeam', /\bbark seams?\b/g, /\b(?:no|not|without)(?: \w+)?\s$/],
+  ['sweep', /\b(?:sweep|sweepy|swept)\b/g, /\b(?:no|not|without|slight|slightly|little|minor|some|bit of)(?: \w+)?\s$/],
+  ['damage', /\bdamaged?\b/g, /\b(?:no|not|without)(?: \w+)?\s$/],
+];
+
+/** Pole-buyer faults named in an utterance ("spike knot", "butt rot", "frost crack"...). */
+export function poleFaultsIn(text: string): PoleFault[] {
+  const t = ` ${text.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ')} `;
+  const out: PoleFault[] = [];
+  for (const [fault, re, cancel] of FAULT_RULES) {
+    for (const m of t.matchAll(re)) {
+      const before = t.slice(Math.max(0, m.index! - 16), m.index!);
+      if (!cancel.test(before)) {
+        out.push(fault);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export function mergeDraft(draft: TreeFields, fields: TreeFields): TreeFields {
   const out: TreeFields = { ...draft };
   if (fields.dbhCm !== undefined && fields.circumferenceCm === undefined) delete out.circumferenceCm;
   for (const key of Object.keys(fields) as (keyof TreeFields)[]) {
     const v = fields[key];
     if (v === undefined) continue;
+    if (key === 'poleFaults' && Array.isArray(v)) {
+      out.poleFaults = [...new Set([...(out.poleFaults ?? []), ...(v as PoleFault[])])];
+      continue;
+    }
     if (key === 'defects' && typeof v === 'string') {
       const prev = out[key];
       if (prev && v) {

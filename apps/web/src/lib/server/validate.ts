@@ -45,6 +45,7 @@ export const fieldsSchema = z.object({
   twist: scaleSchema.optional(),
   branchiness: scaleSchema.optional(),
   defects: z.string().max(1000).optional(),
+  poleFaults: z.array(z.enum(['damage', 'split', 'rot', 'barkSeam', 'knots', 'shake', 'sweep'])).max(7).nullable().optional(),
   leaveTree: z.boolean().optional(),
   notes: z.string().max(4000).optional(),
 }).strict();

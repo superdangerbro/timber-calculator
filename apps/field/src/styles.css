@@ -2644,3 +2644,24 @@ i {
 }
 .card-grid dd.moved { color: var(--orange); }
 .editor-moved { color: var(--orange); font-size: 14px; font-weight: 700; }
+
+/* Prices (Settings) */
+.prices h3 { font-size: 15px; margin: 14px 0 4px; color: #e8f3ec; }
+.prices h3:first-child { margin-top: 4px; }
+.prices .hint { margin: 0 0 8px; }
+.tier-head, .tier-row { display: grid; grid-template-columns: 1fr 1fr 1.2fr 40px; gap: 8px; align-items: center; }
+.tier-head { font-size: 12px; color: #9fb8a8; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.tier-row { margin-bottom: 8px; }
+.prices .price-box { width: 100%; min-width: 0; font-size: 18px; padding: 10px 10px; text-align: right; }
+.tier-x { height: 44px; border-radius: 10px; border: 1px solid #2f5d45; background: transparent; color: #ffb38a; font-size: 18px; }
+.tier-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
+.prices .saw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; }
+.saw-cell { display: grid; grid-template-columns: 36px 1fr; align-items: center; gap: 6px; font-weight: 700; }
+
+/* Pole faults + live pole call */
+.dchip.fault.on { background: #7a2e14; border-color: #ff6b1a; color: #fff; }
+.pole-check { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.pole-check b { font-size: 17px; }
+.pole-check.yes { background: rgba(255, 107, 26, 0.14); border: 1px solid #ff6b1a; color: #ffd9c2; }
+.pole-check.yes b { color: #ff8a3d; }
+.pole-check.no { background: rgba(255, 255, 255, 0.05); border: 1px solid #2f5d45; color: #b9cfc1; }

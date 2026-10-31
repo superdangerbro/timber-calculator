@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SPECIES, type Scale, type SpeciesCode, type TreeFields, type UnitSystem } from '@timber/core';
+import { POLE_FAULTS, SPECIES, type PoleFault, type Scale, type SpeciesCode, type Tree, type TreeFields, type UnitSystem } from '@timber/core';
 import { useApp } from '../app';
 import { useEmitter } from '../lib/emitter';
 import { Icon } from '../components/Icon';
@@ -278,6 +278,60 @@ function DefectsField({ value, onChange }: { value?: string; onChange: (v: strin
   );
 }
 
+function PoleFaultsField({ value, onChange }: { value?: PoleFault[]; onChange: (v: PoleFault[] | undefined) => void }) {
+  const on = new Set(value ?? []);
+  return (
+    <div className="defects-block" data-testid="pole-faults">
+      <div className="seg-head">
+        <span>Pole faults</span>
+        <span className="seg-hint">any one = not a pole</span>
+      </div>
+      <div className="defect-chips">
+        {POLE_FAULTS.map((f) => (
+          <button
+            key={f.code}
+            className={on.has(f.code) ? 'dchip fault on' : 'dchip fault'}
+            title={f.label}
+            onClick={() => {
+              const next = on.has(f.code) ? [...on].filter((x) => x !== f.code) : [...on, f.code];
+              onChange(next.length ? next : undefined);
+            }}
+            data-testid={`fault-${f.code}`}
+          >
+            {f.short}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Live pole call for the tree being entered: length from the buyer card, price band, or why not. */
+function PoleCheck({ d }: { d: TreeFields }) {
+  const { repo } = useApp();
+  const scenario = repo.scenario;
+  if (!d.species || !d.dbhCm || !d.heightM || d.leaveTree) return null;
+  const v = safeValue({ ...(d as Tree), id: 'draft', voided: false } as Tree, scenario);
+  const d6 = v.diam6FtIn ? `${v.diam6FtIn.toFixed(1)}″ at 6 ft` : null;
+  if (v.product === 'pole') {
+    return (
+      <div className="pole-check yes" data-testid="pole-check">
+        <b>Pole · {v.poleLengthFt} ft</b>
+        <span>
+          {[v.cutLengthFt ? `cut ${v.cutLengthFt} ft` : null, d6, v.pricePerM3 ? `$${v.pricePerM3}/m³` : 'price not set'].filter(Boolean).join(' · ')}
+        </span>
+      </div>
+    );
+  }
+  const why = (v.notPoleReasons ?? []).filter((r) => !/not recorded/.test(r));
+  return (
+    <div className="pole-check no" data-testid="pole-check">
+      <b>Sawlog{d6 ? ` · ${d6}` : ''}</b>
+      {why.length ? <span>{why.join('; ')}</span> : null}
+    </div>
+  );
+}
+
 function TreeForm({ t, units, measure, onMeasure }: { t: TallyState; units: UnitSystem; measure: 'circumference' | 'dbh'; onMeasure: () => void }) {
   const { tally } = useApp();
   const d = t.draft;
@@ -365,6 +419,10 @@ function TreeForm({ t, units, measure, onMeasure }: { t: TallyState; units: Unit
       <SegRow field="straightness" value={d.straightness} missing={miss('straightness')} onPick={(n) => tally.setField({ straightness: n })} />
       <SegRow field="twist" value={d.twist} missing={miss('twist')} onPick={(n) => tally.setField({ twist: n })} />
       <SegRow field="branchiness" value={d.branchiness} missing={miss('branchiness')} onPick={(n) => tally.setField({ branchiness: n })} />
+
+      <PoleFaultsField value={d.poleFaults} onChange={(v) => tally.setField({ poleFaults: v })} />
+
+      <PoleCheck d={d} />
 
       <DefectsField value={d.defects} onChange={(v) => tally.setField({ defects: v })} />
 
@@ -600,7 +658,7 @@ export function TallyScreen({ onMeasure }: { onMeasure: () => void }) {
               <span>saw m³</span>
             </div>
             {priced ? (
-              <div>
+              <div data-testid="totals-value">
                 <b>{money(summary.totalValue)}</b>
                 <span>value</span>
               </div>
